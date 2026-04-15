@@ -15,13 +15,13 @@
     }
 
     :root {
-      --panel-width: min(760px, calc(100vw - 56px));
-      --bar-height: 70px;
-      --fill-slant: 24px;
+      --panel-width: min(380px, calc(100vw - 28px));
+      --bar-height: 35px;
+      --fill-slant: 12px;
       --text-white: rgba(255, 255, 255, 0.98);
       --track-1: rgba(89, 66, 41, 0.88);
       --track-2: rgba(67, 48, 30, 0.92);
-      --shadow-strong: 0 14px 30px rgba(0, 0, 0, 0.30);
+      --shadow-strong: 0 7px 15px rgba(0, 0, 0, 0.30);
     }
 
     * { box-sizing: border-box; }
@@ -38,7 +38,7 @@
       display: flex;
       align-items: flex-start;
       justify-content: flex-start;
-      padding: 26px 28px;
+      padding: 13px 14px;
       color: var(--text-white);
       font-family: 'ObelixPro', Arial, sans-serif;
       -webkit-font-smoothing: antialiased;
@@ -50,37 +50,36 @@
     .hud {
       width: var(--panel-width);
       position: relative;
-      transform-origin: left center;
     }
 
     .level-row {
       display: flex;
       align-items: flex-end;
-      gap: 10px;
-      margin: 0 0 4px 10px;
+      gap: 5px;
+      margin: 0 0 2px 5px;
       position: relative;
       z-index: 3;
     }
 
     .level-label {
-      font-size: 22px;
+      font-size: 11px;
       line-height: 1;
-      letter-spacing: 0.3px;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.38);
+      letter-spacing: 0.15px;
+      text-shadow: 0 1px 5px rgba(0, 0, 0, 0.38);
     }
 
     .level-up-pill {
       opacity: 0;
-      transform: translateY(8px) scale(0.9);
-      padding: 6px 12px 4px;
-      font-size: 14px;
+      transform: translateY(4px) scale(0.9);
+      padding: 3px 6px 2px;
+      font-size: 7px;
       line-height: 1;
       border-radius: 999px;
       color: #553100;
       background: linear-gradient(180deg, #fff8bf 0%, #ffd64a 55%, #f2ae00 100%);
       box-shadow:
-        0 8px 18px rgba(0,0,0,0.22),
-        0 0 18px rgba(255, 216, 87, 0.65);
+        0 4px 9px rgba(0,0,0,0.22),
+        0 0 9px rgba(255, 216, 87, 0.65);
     }
 
     .level-up-pill.show {
@@ -90,7 +89,7 @@
     .bar-shell {
       position: relative;
       width: 100%;
-      filter: drop-shadow(0 12px 14px rgba(0,0,0,0.22));
+      filter: drop-shadow(0 6px 7px rgba(0,0,0,0.22));
     }
 
     .bar {
@@ -117,10 +116,10 @@
     .bar::after {
       content: '';
       position: absolute;
-      inset: auto 16px -18px 16px;
-      height: 18px;
+      inset: auto 8px -9px 8px;
+      height: 9px;
       background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0) 75%);
-      filter: blur(8px);
+      filter: blur(4px);
       z-index: -1;
     }
 
@@ -142,9 +141,9 @@
         linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.08) 24%, rgba(0,0,0,0.08) 100%),
         linear-gradient(90deg, #f2b103 0%, #ffc400 42%, #ffc400 80%, #ffdc57 100%);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.22),
-        inset 0 -10px 18px rgba(204,124,0,0.10),
-        0 0 18px rgba(255, 206, 66, 0.18);
+        inset 0 0.5px 0 rgba(255,255,255,0.22),
+        inset 0 -5px 9px rgba(204,124,0,0.10),
+        0 0 9px rgba(255, 206, 66, 0.18);
       clip-path: polygon(0 0, 100% 0, calc(100% - var(--fill-slant)) 100%, 0 100%);
       pointer-events: none;
     }
@@ -160,16 +159,16 @@
     .fill::after {
       content: '';
       position: absolute;
-      top: -10%;
-      right: -10px;
-      width: 25px;
+      top: -5%;
+      right: -5px;
+      width: 12.5px;
       height: 120%;
       transform: skewX(-22deg);
       background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,242,173,0.84) 42%, rgba(255,211,88,0.08) 100%);
-      filter: blur(1.5px);
+      filter: blur(0.75px);
       box-shadow:
-        0 0 22px rgba(255, 232, 150, 0.95),
-        -8px 0 16px rgba(255, 201, 54, 0.32);
+        0 0 11px rgba(255, 232, 150, 0.95),
+        -4px 0 8px rgba(255, 201, 54, 0.32);
       opacity: 0.98;
       pointer-events: none;
       z-index: 1;
@@ -177,12 +176,12 @@
 
     .fill .sweep {
       position: absolute;
-      inset: -8% auto -8% -30%;
-      width: 22%;
+      inset: -4% auto -4% -15%;
+      width: 11%;
       opacity: 0;
       background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,252,223,0.62) 50%, rgba(255,255,255,0) 100%);
       transform: skewX(-20deg);
-      filter: blur(4px);
+      filter: blur(2px);
       mix-blend-mode: screen;
       pointer-events: none;
       z-index: 2;
@@ -197,16 +196,16 @@
       inset: 0;
       display: flex;
       align-items: center;
-      padding: 0 16px;
+      padding: 0 8px;
       z-index: 2;
       pointer-events: none;
     }
 
     .xp-main {
-      font-size: 28px;
+      font-size: 14px;
       line-height: 1;
       white-space: nowrap;
-      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
       transform-origin: left center;
     }
 
@@ -226,15 +225,15 @@
 
     .xp-gain {
       position: absolute;
-      right: 18px;
+      right: 9px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 22px;
+      font-size: 11px;
       line-height: 1;
       color: #fff7bf;
       text-shadow:
-        0 2px 10px rgba(0,0,0,0.45),
-        0 0 14px rgba(255,227,116,0.75);
+        0 1px 5px rgba(0,0,0,0.45),
+        0 0 7px rgba(255,227,116,0.75);
       opacity: 0;
       white-space: nowrap;
     }
@@ -245,11 +244,11 @@
 
     .spark {
       position: absolute;
-      width: 8px;
-      height: 8px;
+      width: 4px;
+      height: 4px;
       border-radius: 999px;
       background: radial-gradient(circle at 35% 35%, #fffef0 0%, #ffd95f 42%, rgba(255,186,0,0) 75%);
-      box-shadow: 0 0 12px rgba(255, 224, 112, 0.75);
+      box-shadow: 0 0 6px rgba(255, 224, 112, 0.75);
       opacity: 0;
       transform: translate(-50%, -50%) scale(0.4);
     }
@@ -260,10 +259,10 @@
 
     .flash {
       position: absolute;
-      inset: -12px;
+      inset: -6px;
       opacity: 0;
       background: radial-gradient(circle at var(--flash-x, 50%) 50%, rgba(255,245,196,0.70) 0%, rgba(255,212,83,0.18) 28%, rgba(255,212,83,0) 58%);
-      filter: blur(4px);
+      filter: blur(2px);
     }
 
     .flash.show {
@@ -279,9 +278,9 @@
     }
 
     @keyframes fill-sweep {
-      0%   { opacity: 0; left: -28%; }
+      0%   { opacity: 0; left: -14%; }
       12%  { opacity: 0.95; }
-      100% { opacity: 0; left: 112%; }
+      100% { opacity: 0; left: 56%; }
     }
 
     @keyframes xp-text-bump {
@@ -293,8 +292,8 @@
     @keyframes xp-gain-float {
       0%   { opacity: 0; transform: translateY(-50%) translateX(0) scale(0.88); }
       18%  { opacity: 1; transform: translateY(-86%) translateX(0) scale(1.02); }
-      70%  { opacity: 1; transform: translateY(-118%) translateX(6px) scale(1.0); }
-      100% { opacity: 0; transform: translateY(-142%) translateX(12px) scale(0.95); }
+      70%  { opacity: 1; transform: translateY(-118%) translateX(3px) scale(1.0); }
+      100% { opacity: 0; transform: translateY(-142%) translateX(6px) scale(0.95); }
     }
 
     @keyframes spark-burst {
@@ -319,8 +318,8 @@
 
     @keyframes hud-hit {
       0%   { transform: translateX(0) scale(1); }
-      18%  { transform: translateX(2px) scale(1.008); }
-      38%  { transform: translateX(-1px) scale(1.004); }
+      18%  { transform: translateX(1px) scale(1.008); }
+      38%  { transform: translateX(-0.5px) scale(1.004); }
       100% { transform: translateX(0) scale(1); }
     }
 
@@ -331,10 +330,10 @@
     }
 
     @keyframes level-pill {
-      0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
+      0%   { opacity: 0; transform: translateY(4px) scale(0.9); }
       14%  { opacity: 1; transform: translateY(0) scale(1.02); }
-      68%  { opacity: 1; transform: translateY(-4px) scale(1); }
-      100% { opacity: 0; transform: translateY(-10px) scale(0.98); }
+      68%  { opacity: 1; transform: translateY(-2px) scale(1); }
+      100% { opacity: 0; transform: translateY(-5px) scale(0.98); }
     }
   </style>
 </head>
@@ -368,7 +367,7 @@
     const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
 
     const LEVEL_UP_SOUND_URL = 'https://ntz619.github.io/XP_Dashboard_prototype/universfield-level-up-04-243762.mp3';
-    
+
     const BASE_XP_PER_LEVEL = 100;
     const XP_GROWTH_FACTOR = 1.18;
     const XP_STEP_ROUNDING = 5;
@@ -393,14 +392,14 @@
     const flashLayerEl = document.getElementById('flashLayer');
 
     const levelUpAudio = new Audio(LEVEL_UP_SOUND_URL);
-      levelUpAudio.preload = 'auto';
-      
-      function playLevelUpSound() {
-        const sound = levelUpAudio.cloneNode();
-        sound.volume = 1;
-        sound.play().catch(() => {});
-      }
-    
+    levelUpAudio.preload = 'auto';
+
+    function playLevelUpSound() {
+      const sound = levelUpAudio.cloneNode();
+      sound.volume = 1;
+      sound.play().catch(() => {});
+    }
+
     function xpNeededForLevel(level) {
       if (level <= 1) return BASE_XP_PER_LEVEL;
       if (xpTableCache[level]) return xpTableCache[level];
@@ -534,14 +533,14 @@
 
     function spawnSparkBurst() {
       const width = barEl.clientWidth;
-      const fillWidth = Math.max(18, fillEl.getBoundingClientRect().width);
-      const centerX = Math.min(width - 24, Math.max(26, fillWidth));
+      const fillWidth = Math.max(9, fillEl.getBoundingClientRect().width);
+      const centerX = Math.min(width - 12, Math.max(13, fillWidth));
       const centerY = barEl.clientHeight / 2;
       const sparks = 12;
 
       for (let i = 0; i < sparks; i++) {
         const angle = (-70 + (140 / Math.max(1, sparks - 1)) * i) * (Math.PI / 180);
-        const distance = 20 + Math.random() * 42;
+        const distance = 10 + Math.random() * 21;
         const spark = document.createElement('div');
         spark.className = 'spark';
         spark.style.left = `${centerX}px`;
@@ -557,8 +556,8 @@
 
     function spawnFlash() {
       const width = barEl.clientWidth;
-      const fillWidth = Math.max(18, fillEl.getBoundingClientRect().width);
-      const x = Math.min(width - 10, Math.max(8, fillWidth));
+      const fillWidth = Math.max(9, fillEl.getBoundingClientRect().width);
+      const x = Math.min(width - 5, Math.max(4, fillWidth));
       const flash = document.createElement('div');
       flash.className = 'flash';
       flash.style.setProperty('--flash-x', `${(x / width) * 100}%`);
@@ -567,16 +566,16 @@
       flash.addEventListener('animationend', () => flash.remove(), { once: true });
     }
 
-      function triggerLevelUp(level) {
-        levelUpPillEl.textContent = `LEVEL ${level}!`;
-        levelUpPillEl.classList.remove('show');
-        void levelUpPillEl.offsetWidth;
-        levelUpPillEl.classList.add('show');
-      
-        playLevelUpSound();
-        spawnFlash();
-        spawnSparkBurst();
-      }
+    function triggerLevelUp(level) {
+      levelUpPillEl.textContent = `LEVEL ${level}!`;
+      levelUpPillEl.classList.remove('show');
+      void levelUpPillEl.offsetWidth;
+      levelUpPillEl.classList.add('show');
+
+      playLevelUpSound();
+      spawnFlash();
+      spawnSparkBurst();
+    }
 
     function normalizePortalsJsonish(raw) {
       return String(raw)
