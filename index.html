@@ -17,6 +17,7 @@
     :root {
       --panel-width: min(760px, calc(100vw - 56px));
       --bar-height: 70px;
+      --fill-slant: 24px;
       --text-white: rgba(255, 255, 255, 0.98);
       --gold-1: #ffd437;
       --gold-2: #ffc400;
@@ -25,7 +26,6 @@
       --track-1: rgba(89, 66, 41, 0.88);
       --track-2: rgba(67, 48, 30, 0.92);
       --shadow-strong: 0 14px 30px rgba(0, 0, 0, 0.30);
-      --shadow-soft: 0 8px 18px rgba(0, 0, 0, 0.18);
     }
 
     * { box-sizing: border-box; }
@@ -141,6 +141,7 @@
     .fill-shape {
       position: absolute;
       inset: 0;
+      z-index: 0;
       background:
         linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.08) 24%, rgba(0,0,0,0.08) 100%),
         linear-gradient(90deg, #f2b103 0%, #ffc400 42%, #ffc400 80%, #ffdc57 100%);
@@ -148,7 +149,8 @@
         inset 0 1px 0 rgba(255,255,255,0.22),
         inset 0 -10px 18px rgba(204,124,0,0.10),
         0 0 18px rgba(255, 206, 66, 0.18);
-      clip-path: polygon(0 0, 100% 0, calc(100% - 24px) 100%, 0 100%);
+      clip-path: polygon(0 0, 100% 0, calc(100% - var(--fill-slant)) 100%, 0 100%);
+      pointer-events: none;
     }
 
     .fill-shape::before {
@@ -163,10 +165,10 @@
       content: '';
       position: absolute;
       top: -10%;
-      right: -10px;
-      width: 25px;
+      right: -24px;
+      width: 52px;
       height: 120%;
-      transform: skewX(-20deg);
+      transform: skewX(-22deg);
       background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,242,173,0.84) 42%, rgba(255,211,88,0.08) 100%);
       filter: blur(1.5px);
       box-shadow:
@@ -174,6 +176,7 @@
         -8px 0 16px rgba(255, 201, 54, 0.32);
       opacity: 0.98;
       pointer-events: none;
+      z-index: 1;
     }
 
     .fill .sweep {
@@ -373,7 +376,6 @@
     let currentUsername = null;
     let pollHandle = null;
     let displayedTotalXp = 0;
-    let lastRenderedLevel = 1;
     let animationFrame = null;
 
     const hudEl = document.getElementById('hud');
@@ -386,8 +388,6 @@
     const sparkLayerEl = document.getElementById('sparkLayer');
     const flashLayerEl = document.getElementById('flashLayer');
 
-    function setStatus() {}
-
     function deriveLevelData(totalXp) {
       const xp = Math.max(0, Number(totalXp) || 0);
       const level = Math.floor(xp / XP_PER_LEVEL) + 1;
@@ -397,13 +397,21 @@
       return { xp, level, current, needed, percent };
     }
 
+    function setFillWidth(percent) {
+      const clamped = Math.max(0, Math.min(100, percent));
+      if (clamped <= 0) {
+        fillEl.style.width = '0%';
+      } else {
+        fillEl.style.width = `calc(${clamped}% + var(--fill-slant))`;
+      }
+    }
+
     function renderXp(totalXp) {
       const { level, current, needed, percent } = deriveLevelData(totalXp);
       levelLabelEl.textContent = `Level ${level}`;
       xpTextEl.textContent = `${Math.round(current)}/${needed}`;
-      fillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+      setFillWidth(percent);
       displayedTotalXp = totalXp;
-      lastRenderedLevel = level;
     }
 
     function animateNumberToXp(targetXp, xpGain = 0) {
@@ -428,7 +436,7 @@
 
         levelLabelEl.textContent = `Level ${level}`;
         xpTextEl.textContent = `${Math.round(current)}/${needed}`;
-        fillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        setFillWidth(percent);
         displayedTotalXp = value;
 
         if (level > levelFxTriggered) {
@@ -648,10 +656,9 @@
         const row = await getPlayerProgress(currentUsername);
         if (row && typeof row.xp !== 'undefined') {
           renderXp(Number(row.xp) || 0);
-          setStatus(`Synced ${currentUsername}`);
         }
       } catch (error) {
-        setStatus(`Sync error: ${error.message}`, true);
+        console.error('Polling sync failed:', error);
       }
     }
 
@@ -669,30 +676,28 @@
         const xpGain = extractXpGain(payload);
         currentUsername = username;
 
-        setStatus(`Updating ${username} (+${xpGain} XP)...`);
         const row = await addPlayerXp(username, xpGain);
         if (!row || typeof row.xp === 'undefined') throw new Error('RPC returned no player row');
 
         animateNumberToXp(Number(row.xp) || 0, xpGain);
-        setStatus(`Updated ${username}: total XP ${row.xp}`);
         startPolling();
       } catch (error) {
-        setStatus(`Message error: ${error.message}`, true);
+        console.error('Portals message handling failed:', error, message);
       }
     }
 
     window.handlePortalsMessage = handlePortalsMessage;
 
     renderXp(0);
-    setStatus('Waiting for Portals message...');
 
     PortalsSdk.setMessageListener((message) => {
+      console.log('PORTALS MSG:', message);
       handlePortalsMessage(message);
     });
 
     window.addEventListener('message', (event) => {
       if (typeof event.data === 'string') {
-        // no-op
+        console.log('Raw postMessage fallback:', event.data);
       }
     });
   </script>
