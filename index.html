@@ -698,17 +698,21 @@
     window.handlePortalsMessage = handlePortalsMessage;
 
     renderXp(0);
+    setStatus('Waiting for Portals message...');
 
-    if (window.PortalsSdk && typeof window.PortalsSdk.setMessageListener === 'function') {
-      window.PortalsSdk.setMessageListener((message) => {
-        console.log('PORTALS MSG:', message);
-        handlePortalsMessage(message);
-      });
-      setStatus('Waiting for Portals message...');
-    } else {
-      console.warn('PortalsSdk not found. You can test manually with handlePortalsMessage(...) in the console.');
-      setStatus('PortalsSdk not found. Manual test: handlePortalsMessage(...)', true);
-    }
+    // Restored the minimal listener pattern from the earlier working version.
+    // Keep this direct and simple so it behaves like the official iframe debugger.
+    PortalsSdk.setMessageListener((message) => {
+      console.log('PORTALS MSG:', message);
+      handlePortalsMessage(message);
+    });
+
+    // Helpful for browser/dev testing; Portals itself uses the SDK listener above.
+    window.addEventListener('message', (event) => {
+      if (typeof event.data === 'string') {
+        console.log('Raw postMessage fallback:', event.data);
+      }
+    });
   </script>
 </body>
 </html>
