@@ -364,16 +364,16 @@
 
     renderXp(0);
 
-    if (window.PortalsSdk && typeof window.PortalsSdk.setMessageListener === 'function') {
-      window.PortalsSdk.setMessageListener((message) => {
-        console.log('PORTALS MSG:', message);
-        handlePortalsMessage(message);
-      });
-      setStatus('Waiting for Portals message...');
-    } else {
-      console.warn('PortalsSdk not found. You can test manually with handlePortalsMessage(...) in the console.');
-      setStatus('PortalsSdk not found. Manual test: handlePortalsMessage(...)', true);
-    }
+    <script>
+  if (window.PortalsSdk && typeof window.PortalsSdk.setMessageListener === 'function') {
+    window.PortalsSdk.setMessageListener((message) => {
+      console.log('PORTALS MSG:', message)
+      handlePortalsMessage(message)
+    })
+  } else {
+    console.warn('PortalsSdk not found. Running in normal browser mode.')
+  }
+</script>
   </script>
 </body>
 </html>
