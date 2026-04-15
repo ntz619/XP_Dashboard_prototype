@@ -3,106 +3,104 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Portals XP Level System</title>
+  <title>XP Dashboard</title>
   <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
   <style>
     @font-face {
-      font-family: "ObelixPro";
-      src: url("./obelix-pro-3.ttf") format("truetype");
+      font-family: 'ObelixPro';
+      src: url('./obelix-pro-3.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
       font-display: swap;
     }
 
     :root {
-      --hud-width: min(94vw, 640px);
-      --hud-height: 116px;
-      --xp-bar-height: 40px;
-      --xp-per-level: 100;
-      --bg-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
-      --text-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+      --bar-height: 82px;
+      --bar-radius: 0px;
+      --track: rgba(62, 47, 34, 0.9);
+      --track-2: rgba(71, 55, 40, 0.95);
+      --gold-1: #ffc400;
+      --gold-2: #ffbf00;
+      --gold-3: #f2b400;
+      --text: #ffffff;
+      --shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
-    html,
-    body {
+    html, body {
+      margin: 0;
       width: 100%;
       height: 100%;
-      margin: 0;
-      overflow: hidden;
       background: transparent;
-      color: #fff;
-      font-family: "ObelixPro", Impact, Arial Black, sans-serif;
+      overflow: hidden;
     }
 
     body {
       display: flex;
       align-items: flex-start;
       justify-content: flex-start;
-      padding: 22px 26px;
+      padding: 28px;
+      color: var(--text);
+      font-family: 'ObelixPro', Arial, sans-serif;
+      text-rendering: geometricPrecision;
+      -webkit-font-smoothing: antialiased;
       user-select: none;
+      pointer-events: none;
     }
 
-    .hud {
-      width: var(--hud-width);
-      max-width: 100%;
-      filter: drop-shadow(var(--bg-shadow));
+    .wrap {
+      width: min(760px, calc(100vw - 56px));
+      pointer-events: none;
     }
 
     .level-label {
-      margin: 0 0 6px 10px;
-      font-size: clamp(18px, 3vw, 26px);
+      margin: 0 0 8px 10px;
+      font-size: 22px;
       line-height: 1;
-      color: #f6f6f1;
-      letter-spacing: 0.02em;
-      text-shadow: var(--text-shadow);
+      color: rgba(255, 255, 255, 0.95);
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      letter-spacing: 0.3px;
     }
 
-    .xp-shell {
+    .bar {
       position: relative;
       width: 100%;
-      height: var(--xp-bar-height);
-      border-radius: 0;
+      height: var(--bar-height);
+      background: linear-gradient(90deg, var(--track-2) 0%, var(--track) 100%);
+      box-shadow: var(--shadow);
       overflow: hidden;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)),
-        linear-gradient(90deg, #6f563d 0%, #5d4534 60%, #4b372b 100%);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.12),
-        inset 0 -2px 0 rgba(0,0,0,0.18);
     }
 
-    .xp-fill {
+    .fill {
       position: absolute;
       inset: 0 auto 0 0;
       width: 0%;
-      min-width: 0;
-      background:
-        linear-gradient(180deg, #ffd441 0%, #ffc800 45%, #f8bb00 100%);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.35),
-        inset 0 -1px 0 rgba(138, 93, 0, 0.28);
-      transition: width 0.45s ease;
+      background: linear-gradient(180deg, #ffcb07 0%, var(--gold-2) 55%, var(--gold-3) 100%);
+      transition: width 380ms ease;
+      will-change: width;
     }
 
-    .xp-fill::after {
-      content: "";
+    .fill::before {
+      content: '';
       position: absolute;
-      top: -6px;
-      right: -10px;
-      width: 22px;
-      height: calc(100% + 12px);
-      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,245,170,0.2));
-      transform: skewX(-22deg);
-      filter: blur(1px);
-      opacity: 0.95;
-      box-shadow: 0 0 18px rgba(255, 234, 130, 0.88);
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.02) 28%, rgba(0,0,0,0.08) 100%);
+      pointer-events: none;
     }
 
-    .xp-fill.at-zero::after {
-      opacity: 0;
-      box-shadow: none;
+    .fill::after {
+      content: '';
+      position: absolute;
+      top: -16%;
+      right: -24px;
+      width: 56px;
+      height: 132%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,245,196,0.85) 38%, rgba(255,214,80,0.2) 100%);
+      transform: skewX(-23deg);
+      filter: blur(2px);
+      opacity: 0.95;
+      box-shadow: 0 0 16px rgba(255, 226, 119, 0.8);
     }
 
     .xp-text {
@@ -110,234 +108,272 @@
       inset: 0;
       display: flex;
       align-items: center;
-      justify-content: flex-start;
-      padding: 0 12px;
-      font-size: clamp(22px, 4vw, 34px);
+      padding: 0 18px;
+      font-size: 28px;
       line-height: 1;
-      color: #fff8de;
-      text-shadow:
-        0 3px 10px rgba(0, 0, 0, 0.42),
-        0 0 2px rgba(0, 0, 0, 0.35);
-      pointer-events: none;
+      color: #fff;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      z-index: 2;
+      white-space: nowrap;
     }
 
     .status {
       margin: 8px 0 0 10px;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.78);
-      text-shadow: var(--text-shadow);
+      min-height: 18px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      opacity: 0.85;
     }
 
     .status.error {
       color: #ffd0d0;
     }
-
-    .debug-note {
-      display: none;
-    }
   </style>
 </head>
 <body>
-  <div class="hud">
-    <div class="level-label" id="levelLabel">Level 1</div>
-    <div class="xp-shell" aria-label="Experience bar">
-      <div class="xp-fill at-zero" id="xpFill"></div>
-      <div class="xp-text" id="xpText">0/100</div>
+  <div class="wrap">
+    <div id="levelLabel" class="level-label">Level 1</div>
+    <div class="bar" aria-label="XP progress">
+      <div id="fill" class="fill"></div>
+      <div id="xpText" class="xp-text">0/100</div>
     </div>
-    <div class="status" id="statusText">Waiting for Portals message…</div>
+    <div id="status" class="status">Waiting for Portals message...</div>
   </div>
 
-  <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
+  <script>
     // =========================
-    // 1) Fill these in first
+    // CONFIG
     // =========================
     const SUPABASE_URL = 'https://tpdedcjccygpwkofdyqg.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
-
-    // =========================
-    // 2) Level system settings
-    // =========================
+    const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
     const XP_PER_LEVEL = 100;
     const POLL_INTERVAL_MS = 5000;
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+    // =========================
+    // STATE
+    // =========================
+    let currentUsername = null;
+    let pollHandle = null;
 
     const levelLabelEl = document.getElementById('levelLabel');
     const xpTextEl = document.getElementById('xpText');
-    const xpFillEl = document.getElementById('xpFill');
-    const statusTextEl = document.getElementById('statusText');
-
-    let currentUsername = null;
-    let pollTimer = null;
-    let isBusy = false;
+    const fillEl = document.getElementById('fill');
+    const statusEl = document.getElementById('status');
 
     function setStatus(text, isError = false) {
-      statusTextEl.textContent = text;
-      statusTextEl.classList.toggle('error', Boolean(isError));
+      statusEl.textContent = text;
+      statusEl.className = isError ? 'status error' : 'status';
     }
 
-    function clampNonNegativeInt(value) {
-      const number = Number(value);
-      if (!Number.isFinite(number)) return 0;
-      return Math.max(0, Math.trunc(number));
-    }
-
-    function computeLevelState(totalXp) {
-      const safeXp = clampNonNegativeInt(totalXp);
-      const level = Math.floor(safeXp / XP_PER_LEVEL) + 1;
-      const xpIntoLevel = safeXp % XP_PER_LEVEL;
-      return {
-        totalXp: safeXp,
-        level,
-        xpIntoLevel,
-        xpNeeded: XP_PER_LEVEL,
-        percent: (xpIntoLevel / XP_PER_LEVEL) * 100,
-      };
+    function deriveLevelData(totalXp) {
+      const xp = Math.max(0, Number(totalXp) || 0);
+      const level = Math.floor(xp / XP_PER_LEVEL) + 1;
+      const current = xp % XP_PER_LEVEL;
+      const needed = XP_PER_LEVEL;
+      const percent = needed === 0 ? 0 : (current / needed) * 100;
+      return { xp, level, current, needed, percent };
     }
 
     function renderXp(totalXp) {
-      const state = computeLevelState(totalXp);
-      levelLabelEl.textContent = `Level ${state.level}`;
-      xpTextEl.textContent = `${state.xpIntoLevel}/${state.xpNeeded}`;
-      xpFillEl.style.width = `${state.percent}%`;
-      xpFillEl.classList.toggle('at-zero', state.percent === 0);
+      const { level, current, needed, percent } = deriveLevelData(totalXp);
+      levelLabelEl.textContent = `Level ${level}`;
+      xpTextEl.textContent = `${current}/${needed}`;
+      fillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    }
+
+    function normalizePortalsJsonish(raw) {
+      return String(raw)
+        .trim()
+        .replace(/=\s*(?=[\[{\"\-\dtruefalsen])/g, ':')
+        .replace(/\r?\n/g, ' ');
     }
 
     function parsePortalsMessage(rawMessage) {
-      if (typeof rawMessage !== 'string') return null;
-      const trimmed = rawMessage.trim();
-      if (!trimmed) return null;
+      const raw = String(rawMessage || '').trim();
+      if (!raw) {
+        throw new Error('Empty message');
+      }
+
+      const attempts = [
+        raw,
+        normalizePortalsJsonish(raw),
+      ];
+
+      for (const candidate of attempts) {
+        try {
+          const parsed = JSON.parse(candidate);
+          if (parsed && typeof parsed === 'object') {
+            return parsed;
+          }
+        } catch (_) {}
+      }
+
+      const usernameMatch = raw.match(/username\s*=\s*(".*?"|[^;\s]+)/i);
+      const xpGainMatch = raw.match(/xp_gain\s*=\s*(\{.*\}|".*?"|[^;\s]+)/i);
+
+      if (usernameMatch || xpGainMatch) {
+        const payload = {};
+
+        if (usernameMatch) {
+          const value = usernameMatch[1].trim();
+          payload.username = value.startsWith('"') ? JSON.parse(value) : value;
+        }
+
+        if (xpGainMatch) {
+          const value = xpGainMatch[1].trim();
+          if (value.startsWith('{')) {
+            payload.xp_gain = JSON.parse(normalizePortalsJsonish(value));
+          } else if (value.startsWith('"')) {
+            payload.xp_gain = JSON.parse(value);
+          } else {
+            payload.xp_gain = Number(value);
+          }
+        }
+
+        return payload;
+      }
+
+      throw new Error(`Could not parse Portals message: ${raw}`);
+    }
+
+    function extractXpGain(payload) {
+      const username = typeof payload.username === 'string' ? payload.username : null;
+      let xpGain = payload.xp_gain;
+
+      if (xpGain && typeof xpGain === 'object' && !Array.isArray(xpGain)) {
+        if (!username) {
+          throw new Error('xp_gain arrived as a player-variable map, but no username was present');
+        }
+        xpGain = xpGain[username];
+      }
+
+      const numeric = Number(xpGain);
+      if (!Number.isFinite(numeric)) {
+        throw new Error(`xp_gain is not a valid number: ${xpGain}`);
+      }
+
+      return Math.max(0, Math.floor(numeric));
+    }
+
+    function buildHeaders() {
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+      };
+
+      // Legacy anon keys are JWTs and can be sent as Bearer.
+      // New publishable keys are not JWTs, so skip Authorization for them.
+      if (!SUPABASE_KEY.startsWith('sb_publishable_')) {
+        headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
+      }
+
+      return headers;
+    }
+
+    async function callRpc(fnName, body) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify(body),
+        cache: 'no-store',
+      });
+
+      const text = await response.text();
+      let data = null;
 
       try {
-        const parsed = JSON.parse(trimmed);
-        return {
-          username: typeof parsed.username === 'string' ? parsed.username : '',
-          xp_gain: clampNonNegativeInt(parsed.xp_gain ?? parsed.xpGain ?? 0),
-        };
+        data = text ? JSON.parse(text) : null;
       } catch {
-        const usernameMatch = trimmed.match(/username\s*=\s*"([^"]+)"/i);
-        const xpMatch = trimmed.match(/xp_gain\s*=\s*(-?\d+)/i);
-        if (!usernameMatch) return null;
-        return {
-          username: usernameMatch[1],
-          xp_gain: clampNonNegativeInt(xpMatch ? xpMatch[1] : 0),
-        };
+        data = text;
       }
+
+      if (!response.ok) {
+        const message = data && typeof data === 'object' ? (data.message || JSON.stringify(data)) : String(data || response.statusText);
+        throw new Error(message);
+      }
+
+      return data;
+    }
+
+    function firstRow(data) {
+      return Array.isArray(data) ? data[0] : data;
     }
 
     async function getPlayerProgress(username) {
-      const { data, error } = await supabase.rpc('get_player_progress', {
-        p_username: username,
-      });
-
-      if (error) throw error;
-
-      const row = Array.isArray(data) ? data[0] : data;
-      return row ?? { username, xp: 0 };
+      const data = await callRpc('get_player_progress', { p_username: username });
+      return firstRow(data);
     }
 
     async function addPlayerXp(username, xpGain) {
-      const { data, error } = await supabase.rpc('add_player_xp', {
+      const data = await callRpc('add_player_xp', {
         p_username: username,
         p_xp_gain: xpGain,
       });
-
-      if (error) throw error;
-
-      const row = Array.isArray(data) ? data[0] : data;
-      return row ?? { username, xp: 0 };
+      return firstRow(data);
     }
 
-    async function syncFromDatabase(username) {
-      const row = await getPlayerProgress(username);
-      renderXp(row.xp ?? 0);
-      setStatus(`Synced ${username} • total XP ${row.xp ?? 0}`);
-      return row;
-    }
-
-    async function handlePayload(payload) {
-      if (!payload || !payload.username) {
-        setStatus('Message ignored: missing username', true);
-        return;
-      }
-
-      if (isBusy) {
-        setStatus('Busy processing previous message…');
-        return;
-      }
-
-      isBusy = true;
-      currentUsername = payload.username;
-
+    async function refreshCurrentPlayer() {
+      if (!currentUsername) return;
       try {
-        if (pollTimer === null) {
-          pollTimer = window.setInterval(async () => {
-            if (!currentUsername) return;
-            try {
-              await syncFromDatabase(currentUsername);
-            } catch (error) {
-              console.error('Polling sync failed:', error);
-              setStatus(`Polling error: ${error.message}`, true);
-            }
-          }, POLL_INTERVAL_MS);
-        }
-
-        if (payload.xp_gain > 0) {
-          setStatus(`Adding ${payload.xp_gain} XP for ${payload.username}…`);
-          const row = await addPlayerXp(payload.username, payload.xp_gain);
-          renderXp(row.xp ?? 0);
-          setStatus(`Added ${payload.xp_gain} XP for ${payload.username} • total XP ${row.xp ?? 0}`);
-        } else {
-          await syncFromDatabase(payload.username);
+        const row = await getPlayerProgress(currentUsername);
+        if (row && typeof row.xp !== 'undefined') {
+          renderXp(row.xp);
+          setStatus(`Synced ${currentUsername}`);
         }
       } catch (error) {
-        console.error('XP update failed:', error);
-        setStatus(`Database error: ${error.message}`, true);
-      } finally {
-        isBusy = false;
+        console.error('Polling sync failed:', error);
+        setStatus(`Sync error: ${error.message}`, true);
       }
     }
 
-    function installPortalsListener() {
-      if (window.PortalsSdk?.setMessageListener) {
-        window.PortalsSdk.setMessageListener(async (message) => {
-          console.log('PORTALS MESSAGE:', message);
-          const payload = parsePortalsMessage(message);
-          await handlePayload(payload);
-        });
-        setStatus('Connected to Portals. Waiting for player data…');
-        return;
-      }
-
-      setStatus('Portals SDK not found. Use window.postMessage(...) for local testing.');
-
-      window.addEventListener('message', async (event) => {
-        const raw = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
-        const payload = parsePortalsMessage(raw);
-        await handlePayload(payload);
-      });
+    function startPolling() {
+      if (pollHandle) clearInterval(pollHandle);
+      pollHandle = setInterval(refreshCurrentPlayer, POLL_INTERVAL_MS);
     }
 
-    // Small helper for browser testing from the dev console:
-    // window.testXp('bus', 25)
-    window.testXp = (username, xpGain) => {
-      const message = JSON.stringify({ username, xp_gain: xpGain });
-      window.postMessage(message, '*');
-    };
+    async function handlePortalsMessage(message) {
+      try {
+        const payload = parsePortalsMessage(message);
+        const username = typeof payload.username === 'string' ? payload.username : null;
+        if (!username) {
+          throw new Error('Missing username in Portals message');
+        }
+
+        const xpGain = extractXpGain(payload);
+        currentUsername = username;
+
+        setStatus(`Updating ${username} (+${xpGain} XP)...`);
+        const row = await addPlayerXp(username, xpGain);
+
+        if (!row || typeof row.xp === 'undefined') {
+          throw new Error('RPC returned no player row');
+        }
+
+        renderXp(row.xp);
+        setStatus(`Updated ${username}: total XP ${row.xp}`);
+        startPolling();
+      } catch (error) {
+        console.error('Portals message handling failed:', error, message);
+        setStatus(`Message error: ${error.message}`, true);
+      }
+    }
+
+    window.handlePortalsMessage = handlePortalsMessage;
 
     renderXp(0);
-    installPortalsListener();
+
+    if (window.PortalsSdk && typeof window.PortalsSdk.setMessageListener === 'function') {
+      window.PortalsSdk.setMessageListener((message) => {
+        console.log('PORTALS MSG:', message);
+        handlePortalsMessage(message);
+      });
+      setStatus('Waiting for Portals message...');
+    } else {
+      console.warn('PortalsSdk not found. You can test manually with handlePortalsMessage(...) in the console.');
+      setStatus('PortalsSdk not found. Manual test: handlePortalsMessage(...)', true);
+    }
   </script>
 </body>
 </html>
