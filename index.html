@@ -1,222 +1,714 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>XP Dashboard</title>
-
   <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
-
   <style>
     @font-face {
       font-family: 'ObelixPro';
       src: url('./obelix-pro-3.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
       font-display: swap;
     }
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: transparent;
-      color: white;
-      font-family: 'ObelixPro', Arial, sans-serif;
-      overflow: hidden;
+    :root {
+      --panel-width: min(760px, calc(100vw - 56px));
+      --bar-height: 70px;
+      --text-white: rgba(255, 255, 255, 0.98);
+      --gold-1: #ffd437;
+      --gold-2: #ffc400;
+      --gold-3: #f3b004;
+      --gold-4: #ffef99;
+      --track-1: rgba(89, 66, 41, 0.88);
+      --track-2: rgba(67, 48, 30, 0.92);
+      --shadow-strong: 0 14px 30px rgba(0, 0, 0, 0.30);
+      --shadow-soft: 0 8px 18px rgba(0, 0, 0, 0.18);
     }
 
-    .wrap {
-      width: 640px;
-      padding: 22px 28px;
-      box-sizing: border-box;
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 26px 28px;
+      color: var(--text-white);
+      font-family: 'ObelixPro', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: geometricPrecision;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .hud {
+      width: var(--panel-width);
+      position: relative;
+      transform-origin: left center;
+    }
+
+    .level-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      margin: 0 0 4px 10px;
+      position: relative;
+      z-index: 3;
     }
 
     .level-label {
-      font-size: 18px;
+      font-size: 22px;
       line-height: 1;
-      margin-bottom: 6px;
-      text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      letter-spacing: 0.3px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.38);
     }
 
-    .xp-text {
-      font-size: 28px;
+    .level-up-pill {
+      opacity: 0;
+      transform: translateY(8px) scale(0.9);
+      padding: 6px 12px 4px;
+      font-size: 14px;
       line-height: 1;
-      margin-bottom: 10px;
-      text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      border-radius: 999px;
+      color: #553100;
+      background: linear-gradient(180deg, #fff8bf 0%, #ffd64a 55%, #f2ae00 100%);
+      box-shadow:
+        0 8px 18px rgba(0,0,0,0.22),
+        0 0 18px rgba(255, 216, 87, 0.65);
+    }
+
+    .level-up-pill.show {
+      animation: level-pill 1.4s ease forwards;
+    }
+
+    .bar-shell {
+      position: relative;
+      width: 100%;
+      filter: drop-shadow(0 12px 14px rgba(0,0,0,0.22));
     }
 
     .bar {
-      width: 100%;
-      height: 40px;
-      background: rgba(65, 45, 28, 0.82);
-      box-shadow: 0 10px 24px rgba(0,0,0,0.28);
-      overflow: hidden;
       position: relative;
+      width: 100%;
+      height: var(--bar-height);
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 18%),
+        linear-gradient(90deg, var(--track-1) 0%, var(--track-2) 100%);
+      box-shadow: var(--shadow-strong);
+      isolation: isolate;
+    }
+
+    .bar::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 22%, rgba(0,0,0,0.12) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .bar::after {
+      content: '';
+      position: absolute;
+      inset: auto 16px -18px 16px;
+      height: 18px;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0) 75%);
+      filter: blur(8px);
+      z-index: -1;
     }
 
     .fill {
-      height: 100%;
+      position: absolute;
+      inset: 0 auto 0 0;
       width: 0%;
-      background: linear-gradient(90deg, #f0b400 0%, #ffc400 80%, #fff0a6 92%, #ffca28 100%);
-      position: relative;
-      transition: width 300ms ease;
+      min-width: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.08) 24%, rgba(0,0,0,0.08) 100%),
+        linear-gradient(90deg, #f2b103 0%, #ffc400 42%, #ffc400 80%, #ffdc57 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.22),
+        inset 0 -10px 18px rgba(204,124,0,0.10),
+        0 0 18px rgba(255, 206, 66, 0.18);
+      will-change: width, filter, transform;
+      z-index: 0;
+    }
+
+    .fill::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.02) 34%, rgba(0,0,0,0.10) 100%);
+      pointer-events: none;
     }
 
     .fill::after {
-      content: "";
+      content: '';
       position: absolute;
-      top: 0;
-      right: -16px;
-      width: 32px;
-      height: 100%;
+      top: -10%;
+      right: -24px;
+      width: 52px;
+      height: 120%;
+      transform: skewX(-22deg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,242,173,0.84) 42%, rgba(255,211,88,0.08) 100%);
+      filter: blur(1.5px);
+      box-shadow:
+        0 0 22px rgba(255, 232, 150, 0.95),
+        -8px 0 16px rgba(255, 201, 54, 0.32);
+      opacity: 0.98;
+      pointer-events: none;
+    }
+
+    .fill .sweep {
+      position: absolute;
+      inset: -8% auto -8% -30%;
+      width: 22%;
+      opacity: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,252,223,0.62) 50%, rgba(255,255,255,0) 100%);
       transform: skewX(-20deg);
-      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.15));
-      filter: blur(0.5px);
+      filter: blur(4px);
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .fill.animate-shimmer .sweep {
+      animation: fill-sweep 900ms ease-out 1;
+    }
+
+    .xp-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .xp-main {
+      font-size: 28px;
+      line-height: 1;
+      white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      transform-origin: left center;
+    }
+
+    .xp-main.bump {
+      animation: xp-text-bump 520ms cubic-bezier(.17,.84,.44,1);
+    }
+
+    .gain-layer,
+    .spark-layer,
+    .flash-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 3;
+    }
+
+    .xp-gain {
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 22px;
+      line-height: 1;
+      color: #fff7bf;
+      text-shadow:
+        0 2px 10px rgba(0,0,0,0.45),
+        0 0 14px rgba(255,227,116,0.75);
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    .xp-gain.show {
+      animation: xp-gain-float 1.25s cubic-bezier(.2,.76,.15,1) forwards;
+    }
+
+    .spark {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 35%, #fffef0 0%, #ffd95f 42%, rgba(255,186,0,0) 75%);
+      box-shadow: 0 0 12px rgba(255, 224, 112, 0.75);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.4);
+    }
+
+    .spark.show {
+      animation: spark-burst var(--life, 900ms) ease-out forwards;
+    }
+
+    .flash {
+      position: absolute;
+      inset: -12px;
+      opacity: 0;
+      background: radial-gradient(circle at var(--flash-x, 50%) 50%, rgba(255,245,196,0.70) 0%, rgba(255,212,83,0.18) 28%, rgba(255,212,83,0) 58%);
+      filter: blur(4px);
+    }
+
+    .flash.show {
+      animation: hit-flash 540ms ease-out forwards;
+    }
+
+    .hud.hit {
+      animation: hud-hit 540ms cubic-bezier(.19,.89,.32,1);
+    }
+
+    .bar.hit .fill {
+      animation: fill-hit 620ms cubic-bezier(.18,.89,.32,1);
     }
 
     .debug {
-      margin-top: 12px;
-      font-family: monospace;
-      font-size: 12px;
-      color: #7CFF7C;
-      white-space: pre-wrap;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      margin: 8px 0 0 10px;
+      min-height: 16px;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: rgba(255,255,255,0.72);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.45);
+      opacity: 0.78;
+      letter-spacing: 0.2px;
+    }
+
+    .debug.error {
+      color: #ffd0d0;
+    }
+
+    @keyframes fill-sweep {
+      0%   { opacity: 0; left: -28%; }
+      12%  { opacity: 0.95; }
+      100% { opacity: 0; left: 112%; }
+    }
+
+    @keyframes xp-text-bump {
+      0%   { transform: scale(1); }
+      26%  { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes xp-gain-float {
+      0%   { opacity: 0; transform: translateY(-50%) translateX(0) scale(0.88); }
+      18%  { opacity: 1; transform: translateY(-86%) translateX(0) scale(1.02); }
+      70%  { opacity: 1; transform: translateY(-118%) translateX(6px) scale(1.0); }
+      100% { opacity: 0; transform: translateY(-142%) translateX(12px) scale(0.95); }
+    }
+
+    @keyframes spark-burst {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translate(0, 0) scale(0.25);
+      }
+      12% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(1.1);
+      }
+    }
+
+    @keyframes hit-flash {
+      0%   { opacity: 0; transform: scale(0.96); }
+      16%  { opacity: 1; transform: scale(1.02); }
+      100% { opacity: 0; transform: scale(1.08); }
+    }
+
+    @keyframes hud-hit {
+      0%   { transform: translateX(0) scale(1); }
+      18%  { transform: translateX(2px) scale(1.008); }
+      38%  { transform: translateX(-1px) scale(1.004); }
+      100% { transform: translateX(0) scale(1); }
+    }
+
+    @keyframes fill-hit {
+      0%   { filter: brightness(1); }
+      30%  { filter: brightness(1.13) saturate(1.08); }
+      100% { filter: brightness(1); }
+    }
+
+    @keyframes level-pill {
+      0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
+      14%  { opacity: 1; transform: translateY(0) scale(1.02); }
+      68%  { opacity: 1; transform: translateY(-4px) scale(1); }
+      100% { opacity: 0; transform: translateY(-10px) scale(0.98); }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div id="levelLabel" class="level-label">Level 1</div>
-    <div id="xpText" class="xp-text">0/100</div>
-    <div class="bar">
-      <div id="fill" class="fill"></div>
+  <div id="hud" class="hud">
+    <div class="level-row">
+      <div id="levelLabel" class="level-label">Level 1</div>
+      <div id="levelUpPill" class="level-up-pill">LEVEL UP!</div>
     </div>
-    <div id="debug" class="debug">Awaiting message...</div>
+
+    <div class="bar-shell">
+      <div id="bar" class="bar" aria-label="XP progress">
+        <div id="fill" class="fill">
+          <div class="sweep"></div>
+        </div>
+
+        <div class="xp-overlay">
+          <div id="xpText" class="xp-main">0/100</div>
+        </div>
+
+        <div id="flashLayer" class="flash-layer"></div>
+        <div id="sparkLayer" class="spark-layer"></div>
+        <div id="gainLayer" class="gain-layer"></div>
+      </div>
+    </div>
+
+    <div id="status" class="debug">Waiting for Portals message...</div>
   </div>
 
   <script>
     const SUPABASE_URL = 'https://tpdedcjccygpwkofdyqg.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
+    const XP_PER_LEVEL = 100;
+    const POLL_INTERVAL_MS = 5000;
 
-    const levelLabel = document.getElementById('levelLabel');
-    const xpText = document.getElementById('xpText');
-    const fill = document.getElementById('fill');
-    const debug = document.getElementById('debug');
+    let currentUsername = null;
+    let pollHandle = null;
+    let displayedTotalXp = 0;
+    let lastRenderedLevel = 1;
+    let animationFrame = null;
 
-    function setDebug(text) {
-      console.log(text);
-      debug.textContent = text;
+    const hudEl = document.getElementById('hud');
+    const barEl = document.getElementById('bar');
+    const fillEl = document.getElementById('fill');
+    const xpTextEl = document.getElementById('xpText');
+    const levelLabelEl = document.getElementById('levelLabel');
+    const levelUpPillEl = document.getElementById('levelUpPill');
+    const gainLayerEl = document.getElementById('gainLayer');
+    const sparkLayerEl = document.getElementById('sparkLayer');
+    const flashLayerEl = document.getElementById('flashLayer');
+    const statusEl = document.getElementById('status');
+
+    function setStatus(text, isError = false) {
+      statusEl.textContent = text;
+      statusEl.className = isError ? 'debug error' : 'debug';
     }
 
-    function xpNeededForLevel(level) {
-      return 100;
+    function deriveLevelData(totalXp) {
+      const xp = Math.max(0, Number(totalXp) || 0);
+      const level = Math.floor(xp / XP_PER_LEVEL) + 1;
+      const current = xp % XP_PER_LEVEL;
+      const needed = XP_PER_LEVEL;
+      const percent = (current / needed) * 100;
+      return { xp, level, current, needed, percent };
     }
 
-    function computeLevel(totalXp) {
-      const level = Math.floor(totalXp / 100) + 1;
-      const currentXp = totalXp % 100;
-      const neededXp = xpNeededForLevel(level);
-      return { level, currentXp, neededXp };
+    function renderXp(totalXp) {
+      const { level, current, needed, percent } = deriveLevelData(totalXp);
+      levelLabelEl.textContent = `Level ${level}`;
+      xpTextEl.textContent = `${Math.round(current)}/${needed}`;
+      fillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+      displayedTotalXp = totalXp;
+      lastRenderedLevel = level;
     }
 
-    function render(totalXp) {
-      const safeXp = Math.max(0, Number(totalXp) || 0);
-      const { level, currentXp, neededXp } = computeLevel(safeXp);
-      levelLabel.textContent = `Level ${level}`;
-      xpText.textContent = `${currentXp}/${neededXp}`;
-      fill.style.width = `${Math.max(0, Math.min(100, (currentXp / neededXp) * 100))}%`;
+    function animateNumberToXp(targetXp, xpGain = 0) {
+      const startXp = displayedTotalXp;
+      const endXp = Math.max(0, Number(targetXp) || 0);
+      const startLevel = deriveLevelData(startXp).level;
+      const endLevel = deriveLevelData(endXp).level;
+      const duration = Math.min(1500, Math.max(650, Math.abs(endXp - startXp) * 12));
+      const startedAt = performance.now();
+
+      if (animationFrame) cancelAnimationFrame(animationFrame);
+
+      triggerGainEffects(xpGain);
+
+      let levelFxTriggered = startLevel;
+
+      function frame(now) {
+        const t = Math.min(1, (now - startedAt) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const value = startXp + (endXp - startXp) * eased;
+        const { level, current, needed, percent } = deriveLevelData(value);
+
+        levelLabelEl.textContent = `Level ${level}`;
+        xpTextEl.textContent = `${Math.round(current)}/${needed}`;
+        fillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        displayedTotalXp = value;
+
+        if (level > levelFxTriggered) {
+          levelFxTriggered = level;
+          triggerLevelUp(level);
+        }
+
+        if (t < 1) {
+          animationFrame = requestAnimationFrame(frame);
+        } else {
+          displayedTotalXp = endXp;
+          renderXp(endXp);
+          if (endLevel > startLevel) {
+            triggerLevelUp(endLevel);
+          }
+          animationFrame = null;
+        }
+      }
+
+      animationFrame = requestAnimationFrame(frame);
     }
 
-    async function rpc(fn, body) {
+    function triggerGainEffects(xpGain) {
+      const gain = Math.max(0, Number(xpGain) || 0);
+      hudEl.classList.remove('hit');
+      barEl.classList.remove('hit');
+      fillEl.classList.remove('animate-shimmer');
+      xpTextEl.classList.remove('bump');
+
+      void hudEl.offsetWidth;
+      hudEl.classList.add('hit');
+      barEl.classList.add('hit');
+      fillEl.classList.add('animate-shimmer');
+      xpTextEl.classList.add('bump');
+
+      if (gain > 0) {
+        spawnGainText(gain);
+        spawnSparkBurst();
+        spawnFlash();
+      }
+
+      setTimeout(() => {
+        hudEl.classList.remove('hit');
+        barEl.classList.remove('hit');
+        fillEl.classList.remove('animate-shimmer');
+        xpTextEl.classList.remove('bump');
+      }, 900);
+    }
+
+    function spawnGainText(gain) {
+      const el = document.createElement('div');
+      el.className = 'xp-gain';
+      el.textContent = `+${gain} XP`;
+      gainLayerEl.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }
+
+    function spawnSparkBurst() {
+      const width = barEl.clientWidth;
+      const fillWidth = Math.max(18, fillEl.getBoundingClientRect().width);
+      const centerX = Math.min(width - 24, Math.max(26, fillWidth));
+      const centerY = barEl.clientHeight / 2;
+      const sparks = 12;
+
+      for (let i = 0; i < sparks; i++) {
+        const angle = (-70 + (140 / Math.max(1, sparks - 1)) * i) * (Math.PI / 180);
+        const distance = 20 + Math.random() * 42;
+        const spark = document.createElement('div');
+        spark.className = 'spark';
+        spark.style.left = `${centerX}px`;
+        spark.style.top = `${centerY}px`;
+        spark.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+        spark.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
+        spark.style.setProperty('--life', `${650 + Math.random() * 350}ms`);
+        sparkLayerEl.appendChild(spark);
+        requestAnimationFrame(() => spark.classList.add('show'));
+        spark.addEventListener('animationend', () => spark.remove(), { once: true });
+      }
+    }
+
+    function spawnFlash() {
+      const width = barEl.clientWidth;
+      const fillWidth = Math.max(18, fillEl.getBoundingClientRect().width);
+      const x = Math.min(width - 10, Math.max(8, fillWidth));
+      const flash = document.createElement('div');
+      flash.className = 'flash';
+      flash.style.setProperty('--flash-x', `${(x / width) * 100}%`);
+      flashLayerEl.appendChild(flash);
+      requestAnimationFrame(() => flash.classList.add('show'));
+      flash.addEventListener('animationend', () => flash.remove(), { once: true });
+    }
+
+    function triggerLevelUp(level) {
+      levelUpPillEl.textContent = `LEVEL ${level}!`;
+      levelUpPillEl.classList.remove('show');
+      void levelUpPillEl.offsetWidth;
+      levelUpPillEl.classList.add('show');
+      spawnFlash();
+      spawnSparkBurst();
+    }
+
+    function normalizePortalsJsonish(raw) {
+      return String(raw)
+        .trim()
+        .replace(/=\s*(?=[\[{\"\-\dtruefalsen])/g, ':')
+        .replace(/\r?\n/g, ' ');
+    }
+
+    function parsePortalsMessage(rawMessage) {
+      const raw = String(rawMessage || '').trim();
+      if (!raw) throw new Error('Empty message');
+
+      const attempts = [raw, normalizePortalsJsonish(raw)];
+      for (const candidate of attempts) {
+        try {
+          const parsed = JSON.parse(candidate);
+          if (parsed && typeof parsed === 'object') return parsed;
+        } catch (_) {}
+      }
+
+      const usernameMatch = raw.match(/username\s*=\s*(".*?"|[^;\s]+)/i);
+      const xpGainMatch = raw.match(/xp_gain\s*=\s*(\{.*\}|".*?"|[^;\s]+)/i);
+
+      if (usernameMatch || xpGainMatch) {
+        const payload = {};
+        if (usernameMatch) {
+          const value = usernameMatch[1].trim();
+          payload.username = value.startsWith('"') ? JSON.parse(value) : value;
+        }
+        if (xpGainMatch) {
+          const value = xpGainMatch[1].trim();
+          if (value.startsWith('{')) payload.xp_gain = JSON.parse(normalizePortalsJsonish(value));
+          else if (value.startsWith('"')) payload.xp_gain = JSON.parse(value);
+          else payload.xp_gain = Number(value);
+        }
+        return payload;
+      }
+
+      throw new Error(`Could not parse Portals message: ${raw}`);
+    }
+
+    function extractXpGain(payload) {
+      const username = typeof payload.username === 'string' ? payload.username : null;
+      let xpGain = payload.xp_gain;
+
+      if (xpGain && typeof xpGain === 'object' && !Array.isArray(xpGain)) {
+        if (!username) throw new Error('xp_gain arrived as a player-variable map, but no username was present');
+        xpGain = xpGain[username];
+      }
+
+      const numeric = Number(xpGain);
+      if (!Number.isFinite(numeric)) throw new Error(`xp_gain is not a valid number: ${xpGain}`);
+      return Math.max(0, Math.floor(numeric));
+    }
+
+    function buildHeaders() {
       const headers = {
         'Content-Type': 'application/json',
         'apikey': SUPABASE_KEY,
       };
 
-      if (SUPABASE_KEY.split('.').length === 3) {
+      if (!SUPABASE_KEY.startsWith('sb_publishable_')) {
         headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
       }
 
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+      return headers;
+    }
+
+    async function callRpc(fnName, body) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
         method: 'POST',
-        headers,
+        headers: buildHeaders(),
         body: JSON.stringify(body),
+        cache: 'no-store',
       });
 
-      const data = await response.json().catch(() => null);
+      const text = await response.text();
+      let data = null;
+
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = text;
+      }
 
       if (!response.ok) {
-        throw data || { message: `HTTP ${response.status}` };
+        const message = data && typeof data === 'object'
+          ? (data.message || JSON.stringify(data))
+          : String(data || response.statusText);
+        throw new Error(message);
       }
 
       return data;
     }
 
+    function firstRow(data) {
+      return Array.isArray(data) ? data[0] : data;
+    }
+
     async function getPlayerProgress(username) {
-      const result = await rpc('get_player_progress', { p_username: username });
-      return Array.isArray(result) ? result[0] : result;
+      const data = await callRpc('get_player_progress', { p_username: username });
+      return firstRow(data);
     }
 
     async function addPlayerXp(username, xpGain) {
-      const result = await rpc('add_player_xp', {
+      const data = await callRpc('add_player_xp', {
         p_username: username,
         p_xp_gain: xpGain,
       });
-      return Array.isArray(result) ? result[0] : result;
+      return firstRow(data);
     }
 
-    function parseMessage(raw) {
-      const payload = JSON.parse(raw);
-
-      const username = payload.username;
-      let xpGain = payload.xp_gain;
-
-      if (xpGain && typeof xpGain === 'object' && username in xpGain) {
-        xpGain = xpGain[username];
+    async function refreshCurrentPlayer() {
+      if (!currentUsername) return;
+      try {
+        const row = await getPlayerProgress(currentUsername);
+        if (row && typeof row.xp !== 'undefined') {
+          renderXp(Number(row.xp) || 0);
+          setStatus(`Synced ${currentUsername}`);
+        }
+      } catch (error) {
+        console.error('Polling sync failed:', error);
+        setStatus(`Sync error: ${error.message}`, true);
       }
+    }
 
-      xpGain = Number(xpGain || 0);
-
-      return {
-        username,
-        xpGain: Number.isFinite(xpGain) ? xpGain : 0,
-      };
+    function startPolling() {
+      if (pollHandle) clearInterval(pollHandle);
+      pollHandle = setInterval(refreshCurrentPlayer, POLL_INTERVAL_MS);
     }
 
     async function handlePortalsMessage(message) {
-      setDebug(`PORTALS MSG: ${message}`);
-
-      let parsed;
       try {
-        parsed = parseMessage(message);
-      } catch (error) {
-        setDebug(`Parse error: ${String(error)}`);
-        return;
-      }
+        const payload = parsePortalsMessage(message);
+        const username = typeof payload.username === 'string' ? payload.username : null;
+        if (!username) throw new Error('Missing username in Portals message');
 
-      if (!parsed.username) {
-        setDebug('Missing username');
-        return;
-      }
+        const xpGain = extractXpGain(payload);
+        currentUsername = username;
 
-      try {
-        const updated = await addPlayerXp(parsed.username, parsed.xpGain);
-        const totalXp = Number(updated?.xp || 0);
-        render(totalXp);
-        setDebug(`Updated ${parsed.username}: +${parsed.xpGain} XP => ${totalXp}`);
+        setStatus(`Updating ${username} (+${xpGain} XP)...`);
+        const row = await addPlayerXp(username, xpGain);
+        if (!row || typeof row.xp === 'undefined') throw new Error('RPC returned no player row');
+
+        animateNumberToXp(Number(row.xp) || 0, xpGain);
+        setStatus(`Updated ${username}: total XP ${row.xp}`);
+        startPolling();
       } catch (error) {
-        console.error(error);
-        setDebug(`DB error: ${JSON.stringify(error)}`);
+        console.error('Portals message handling failed:', error, message);
+        setStatus(`Message error: ${error.message}`, true);
       }
     }
 
-    PortalsSdk.setMessageListener((message) => {
-      handlePortalsMessage(message);
-    });
+    window.handlePortalsMessage = handlePortalsMessage;
 
-    window.addEventListener('message', (event) => {
-      if (typeof event.data === 'string') {
-        console.log('Raw postMessage fallback:', event.data);
-      }
-    });
+    renderXp(0);
+
+    if (window.PortalsSdk && typeof window.PortalsSdk.setMessageListener === 'function') {
+      window.PortalsSdk.setMessageListener((message) => {
+        console.log('PORTALS MSG:', message);
+        handlePortalsMessage(message);
+      });
+      setStatus('Waiting for Portals message...');
+    } else {
+      console.warn('PortalsSdk not found. You can test manually with handlePortalsMessage(...) in the console.');
+      setStatus('PortalsSdk not found. Manual test: handlePortalsMessage(...)', true);
+    }
   </script>
 </body>
 </html>
