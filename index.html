@@ -367,6 +367,8 @@
     const SUPABASE_URL = 'https://tpdedcjccygpwkofdyqg.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
 
+    const LEVEL_UP_SOUND_URL = 'https://ntz619.github.io/XP_Dashboard_prototype/universfield-level-up-04-243762.mp3';
+    
     const BASE_XP_PER_LEVEL = 100;
     const XP_GROWTH_FACTOR = 1.18;
     const XP_STEP_ROUNDING = 5;
@@ -390,6 +392,15 @@
     const sparkLayerEl = document.getElementById('sparkLayer');
     const flashLayerEl = document.getElementById('flashLayer');
 
+    const levelUpAudio = new Audio(LEVEL_UP_SOUND_URL);
+      levelUpAudio.preload = 'auto';
+      
+      function playLevelUpSound() {
+        const sound = levelUpAudio.cloneNode();
+        sound.volume = 1;
+        sound.play().catch(() => {});
+      }
+    
     function xpNeededForLevel(level) {
       if (level <= 1) return BASE_XP_PER_LEVEL;
       if (xpTableCache[level]) return xpTableCache[level];
@@ -556,14 +567,16 @@
       flash.addEventListener('animationend', () => flash.remove(), { once: true });
     }
 
-    function triggerLevelUp(level) {
-      levelUpPillEl.textContent = `LEVEL ${level}!`;
-      levelUpPillEl.classList.remove('show');
-      void levelUpPillEl.offsetWidth;
-      levelUpPillEl.classList.add('show');
-      spawnFlash();
-      spawnSparkBurst();
-    }
+      function triggerLevelUp(level) {
+        levelUpPillEl.textContent = `LEVEL ${level}!`;
+        levelUpPillEl.classList.remove('show');
+        void levelUpPillEl.offsetWidth;
+        levelUpPillEl.classList.add('show');
+      
+        playLevelUpSound();
+        spawnFlash();
+        spawnSparkBurst();
+      }
 
     function normalizePortalsJsonish(raw) {
       return String(raw)
