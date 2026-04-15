@@ -19,10 +19,6 @@
       --bar-height: 70px;
       --fill-slant: 24px;
       --text-white: rgba(255, 255, 255, 0.98);
-      --gold-1: #ffd437;
-      --gold-2: #ffc400;
-      --gold-3: #f3b004;
-      --gold-4: #ffef99;
       --track-1: rgba(89, 66, 41, 0.88);
       --track-2: rgba(67, 48, 30, 0.92);
       --shadow-strong: 0 14px 30px rgba(0, 0, 0, 0.30);
@@ -165,8 +161,8 @@
       content: '';
       position: absolute;
       top: -10%;
-      right: -10px;
-      width: 25px;
+      right: -24px;
+      width: 52px;
       height: 120%;
       transform: skewX(-22deg);
       background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,242,173,0.84) 42%, rgba(255,211,88,0.08) 100%);
@@ -370,8 +366,14 @@
   <script>
     const SUPABASE_URL = 'https://tpdedcjccygpwkofdyqg.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
-    const XP_PER_LEVEL = 100;
+
+    const BASE_XP_PER_LEVEL = 100;
+    const XP_GROWTH_FACTOR = 1.18;
+    const XP_STEP_ROUNDING = 5;
+    const MIN_XP_STEP = 10;
     const POLL_INTERVAL_MS = 5000;
+
+    const xpTableCache = [0, BASE_XP_PER_LEVEL];
 
     let currentUsername = null;
     let pollHandle = null;
@@ -388,12 +390,36 @@
     const sparkLayerEl = document.getElementById('sparkLayer');
     const flashLayerEl = document.getElementById('flashLayer');
 
+    function xpNeededForLevel(level) {
+      if (level <= 1) return BASE_XP_PER_LEVEL;
+      if (xpTableCache[level]) return xpTableCache[level];
+
+      for (let i = xpTableCache.length; i <= level; i++) {
+        const raw = BASE_XP_PER_LEVEL * Math.pow(XP_GROWTH_FACTOR, i - 1);
+        const rounded = Math.round(raw / XP_STEP_ROUNDING) * XP_STEP_ROUNDING;
+        const previous = xpTableCache[i - 1];
+        xpTableCache[i] = Math.max(rounded, previous + MIN_XP_STEP);
+      }
+
+      return xpTableCache[level];
+    }
+
     function deriveLevelData(totalXp) {
       const xp = Math.max(0, Number(totalXp) || 0);
-      const level = Math.floor(xp / XP_PER_LEVEL) + 1;
-      const current = xp % XP_PER_LEVEL;
-      const needed = XP_PER_LEVEL;
-      const percent = (current / needed) * 100;
+
+      let level = 1;
+      let remainingXp = xp;
+      let needed = xpNeededForLevel(level);
+
+      while (remainingXp >= needed) {
+        remainingXp -= needed;
+        level += 1;
+        needed = xpNeededForLevel(level);
+      }
+
+      const current = remainingXp;
+      const percent = needed > 0 ? (current / needed) * 100 : 0;
+
       return { xp, level, current, needed, percent };
     }
 
@@ -563,16 +589,19 @@
 
       if (usernameMatch || xpGainMatch) {
         const payload = {};
+
         if (usernameMatch) {
           const value = usernameMatch[1].trim();
           payload.username = value.startsWith('"') ? JSON.parse(value) : value;
         }
+
         if (xpGainMatch) {
           const value = xpGainMatch[1].trim();
           if (value.startsWith('{')) payload.xp_gain = JSON.parse(normalizePortalsJsonish(value));
           else if (value.startsWith('"')) payload.xp_gain = JSON.parse(value);
           else payload.xp_gain = Number(value);
         }
+
         return payload;
       }
 
@@ -652,14 +681,13 @@
 
     async function refreshCurrentPlayer() {
       if (!currentUsername) return;
+
       try {
         const row = await getPlayerProgress(currentUsername);
         if (row && typeof row.xp !== 'undefined') {
           renderXp(Number(row.xp) || 0);
         }
-      } catch (error) {
-        console.error('Polling sync failed:', error);
-      }
+      } catch (_) {}
     }
 
     function startPolling() {
@@ -681,9 +709,7 @@
 
         animateNumberToXp(Number(row.xp) || 0, xpGain);
         startPolling();
-      } catch (error) {
-        console.error('Portals message handling failed:', error, message);
-      }
+      } catch (_) {}
     }
 
     window.handlePortalsMessage = handlePortalsMessage;
@@ -691,13 +717,12 @@
     renderXp(0);
 
     PortalsSdk.setMessageListener((message) => {
-      console.log('PORTALS MSG:', message);
       handlePortalsMessage(message);
     });
 
     window.addEventListener('message', (event) => {
       if (typeof event.data === 'string') {
-        console.log('Raw postMessage fallback:', event.data);
+        // fallback listener kept for browser/dev environments
       }
     });
   </script>
