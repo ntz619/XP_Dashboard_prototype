@@ -1,4 +1,373 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XP Dashboard</title>
+  <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+  <style>
+    @font-face {
+      font-family: 'ObelixPro';
+      src: url('./obelix-pro-3.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    :root {
+      --panel-width: min(760px, calc(100vw - 56px));
+      --bar-height: 70px;
+      --fill-slant: 24px;
+      --text-white: rgba(255, 255, 255, 0.98);
+      --gold-1: #ffd437;
+      --gold-2: #ffc400;
+      --gold-3: #f3b004;
+      --gold-4: #ffef99;
+      --track-1: rgba(89, 66, 41, 0.88);
+      --track-2: rgba(67, 48, 30, 0.92);
+      --shadow-strong: 0 14px 30px rgba(0, 0, 0, 0.30);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 26px 28px;
+      color: var(--text-white);
+      font-family: 'ObelixPro', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: geometricPrecision;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .hud {
+      width: var(--panel-width);
+      position: relative;
+      transform-origin: left center;
+    }
+
+    .level-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      margin: 0 0 4px 10px;
+      position: relative;
+      z-index: 3;
+    }
+
+    .level-label {
+      font-size: 22px;
+      line-height: 1;
+      letter-spacing: 0.3px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.38);
+    }
+
+    .level-up-pill {
+      opacity: 0;
+      transform: translateY(8px) scale(0.9);
+      padding: 6px 12px 4px;
+      font-size: 14px;
+      line-height: 1;
+      border-radius: 999px;
+      color: #553100;
+      background: linear-gradient(180deg, #fff8bf 0%, #ffd64a 55%, #f2ae00 100%);
+      box-shadow:
+        0 8px 18px rgba(0,0,0,0.22),
+        0 0 18px rgba(255, 216, 87, 0.65);
+    }
+
+    .level-up-pill.show {
+      animation: level-pill 1.4s ease forwards;
+    }
+
+    .bar-shell {
+      position: relative;
+      width: 100%;
+      filter: drop-shadow(0 12px 14px rgba(0,0,0,0.22));
+    }
+
+    .bar {
+      position: relative;
+      width: 100%;
+      height: var(--bar-height);
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 18%),
+        linear-gradient(90deg, var(--track-1) 0%, var(--track-2) 100%);
+      box-shadow: var(--shadow-strong);
+      isolation: isolate;
+    }
+
+    .bar::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 22%, rgba(0,0,0,0.12) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .bar::after {
+      content: '';
+      position: absolute;
+      inset: auto 16px -18px 16px;
+      height: 18px;
+      background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0) 75%);
+      filter: blur(8px);
+      z-index: -1;
+    }
+
+    .fill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 0%;
+      min-width: 0;
+      will-change: width, filter, transform;
+      z-index: 0;
+      overflow: visible;
+    }
+
+    .fill-shape {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.08) 24%, rgba(0,0,0,0.08) 100%),
+        linear-gradient(90deg, #f2b103 0%, #ffc400 42%, #ffc400 80%, #ffdc57 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.22),
+        inset 0 -10px 18px rgba(204,124,0,0.10),
+        0 0 18px rgba(255, 206, 66, 0.18);
+      clip-path: polygon(0 0, 100% 0, calc(100% - var(--fill-slant)) 100%, 0 100%);
+      pointer-events: none;
+    }
+
+    .fill-shape::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.02) 34%, rgba(0,0,0,0.10) 100%);
+      pointer-events: none;
+    }
+
+    .fill::after {
+      content: '';
+      position: absolute;
+      top: -10%;
+      right: -10px;
+      width: 25px;
+      height: 120%;
+      transform: skewX(-22deg);
+      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,242,173,0.84) 42%, rgba(255,211,88,0.08) 100%);
+      filter: blur(1.5px);
+      box-shadow:
+        0 0 22px rgba(255, 232, 150, 0.95),
+        -8px 0 16px rgba(255, 201, 54, 0.32);
+      opacity: 0.98;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .fill .sweep {
+      position: absolute;
+      inset: -8% auto -8% -30%;
+      width: 22%;
+      opacity: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,252,223,0.62) 50%, rgba(255,255,255,0) 100%);
+      transform: skewX(-20deg);
+      filter: blur(4px);
+      mix-blend-mode: screen;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .fill.animate-shimmer .sweep {
+      animation: fill-sweep 900ms ease-out 1;
+    }
+
+    .xp-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .xp-main {
+      font-size: 28px;
+      line-height: 1;
+      white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      transform-origin: left center;
+    }
+
+    .xp-main.bump {
+      animation: xp-text-bump 520ms cubic-bezier(.17,.84,.44,1);
+    }
+
+    .gain-layer,
+    .spark-layer,
+    .flash-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 3;
+    }
+
+    .xp-gain {
+      position: absolute;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 22px;
+      line-height: 1;
+      color: #fff7bf;
+      text-shadow:
+        0 2px 10px rgba(0,0,0,0.45),
+        0 0 14px rgba(255,227,116,0.75);
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    .xp-gain.show {
+      animation: xp-gain-float 1.25s cubic-bezier(.2,.76,.15,1) forwards;
+    }
+
+    .spark {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 35%, #fffef0 0%, #ffd95f 42%, rgba(255,186,0,0) 75%);
+      box-shadow: 0 0 12px rgba(255, 224, 112, 0.75);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.4);
+    }
+
+    .spark.show {
+      animation: spark-burst var(--life, 900ms) ease-out forwards;
+    }
+
+    .flash {
+      position: absolute;
+      inset: -12px;
+      opacity: 0;
+      background: radial-gradient(circle at var(--flash-x, 50%) 50%, rgba(255,245,196,0.70) 0%, rgba(255,212,83,0.18) 28%, rgba(255,212,83,0) 58%);
+      filter: blur(4px);
+    }
+
+    .flash.show {
+      animation: hit-flash 540ms ease-out forwards;
+    }
+
+    .hud.hit {
+      animation: hud-hit 540ms cubic-bezier(.19,.89,.32,1);
+    }
+
+    .bar.hit .fill {
+      animation: fill-hit 620ms cubic-bezier(.18,.89,.32,1);
+    }
+
+    @keyframes fill-sweep {
+      0%   { opacity: 0; left: -28%; }
+      12%  { opacity: 0.95; }
+      100% { opacity: 0; left: 112%; }
+    }
+
+    @keyframes xp-text-bump {
+      0%   { transform: scale(1); }
+      26%  { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes xp-gain-float {
+      0%   { opacity: 0; transform: translateY(-50%) translateX(0) scale(0.88); }
+      18%  { opacity: 1; transform: translateY(-86%) translateX(0) scale(1.02); }
+      70%  { opacity: 1; transform: translateY(-118%) translateX(6px) scale(1.0); }
+      100% { opacity: 0; transform: translateY(-142%) translateX(12px) scale(0.95); }
+    }
+
+    @keyframes spark-burst {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translate(0, 0) scale(0.25);
+      }
+      12% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(1.1);
+      }
+    }
+
+    @keyframes hit-flash {
+      0%   { opacity: 0; transform: scale(0.96); }
+      16%  { opacity: 1; transform: scale(1.02); }
+      100% { opacity: 0; transform: scale(1.08); }
+    }
+
+    @keyframes hud-hit {
+      0%   { transform: translateX(0) scale(1); }
+      18%  { transform: translateX(2px) scale(1.008); }
+      38%  { transform: translateX(-1px) scale(1.004); }
+      100% { transform: translateX(0) scale(1); }
+    }
+
+    @keyframes fill-hit {
+      0%   { filter: brightness(1); }
+      30%  { filter: brightness(1.13) saturate(1.08); }
+      100% { filter: brightness(1); }
+    }
+
+    @keyframes level-pill {
+      0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
+      14%  { opacity: 1; transform: translateY(0) scale(1.02); }
+      68%  { opacity: 1; transform: translateY(-4px) scale(1); }
+      100% { opacity: 0; transform: translateY(-10px) scale(0.98); }
+    }
+  </style>
+</head>
+<body>
+  <div id="hud" class="hud">
+    <div class="level-row">
+      <div id="levelLabel" class="level-label">Level 1</div>
+      <div id="levelUpPill" class="level-up-pill">LEVEL UP!</div>
+    </div>
+
+    <div class="bar-shell">
+      <div id="bar" class="bar" aria-label="XP progress">
+        <div id="fill" class="fill">
+          <div class="fill-shape"></div>
+          <div class="sweep"></div>
+        </div>
+
+        <div class="xp-overlay">
+          <div id="xpText" class="xp-main">0/100</div>
+        </div>
+
+        <div id="flashLayer" class="flash-layer"></div>
+        <div id="sparkLayer" class="spark-layer"></div>
+        <div id="gainLayer" class="gain-layer"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
   const SUPABASE_URL = 'https://tpdedcjccygpwkofdyqg.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
 
@@ -84,7 +453,7 @@
     levelLabelEl.textContent = `Level ${level}`;
     xpTextEl.textContent = `${Math.round(current)}/${needed}`;
     setFillWidth(percent);
-    displayedTotalXp = totalXp;
+    displayedTotalXp = Number(totalXp) || 0;
   }
 
   function setXpInstant(totalXp) {
@@ -101,7 +470,6 @@
     const startXp = displayedTotalXp;
     const endXp = Math.max(0, Number(targetXp) || 0);
     const startLevel = deriveLevelData(startXp).level;
-    const endLevel = deriveLevelData(endXp).level;
     const duration = Math.min(1500, Math.max(650, Math.abs(endXp - startXp) * 12));
     const startedAt = performance.now();
 
@@ -130,12 +498,8 @@
       if (t < 1) {
         animationFrame = requestAnimationFrame(frame);
       } else {
-        displayedTotalXp = endXp;
-        renderXp(endXp);
-        if (endLevel > startLevel) {
-          triggerLevelUp(endLevel);
-        }
         animationFrame = null;
+        renderXp(endXp);
       }
     }
 
@@ -398,3 +762,5 @@
     }
   });
 </script>
+</body>
+</html>
