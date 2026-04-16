@@ -1,742 +1,400 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XP Dashboard</title>
-  <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
-  <style>
-    @font-face {
-      font-family: 'ObelixPro';
-      src: url('./obelix-pro-3.ttf') format('truetype');
-      font-weight: normal;
-      font-style: normal;
-      font-display: swap;
+<script>
+  const SUPABASE_URL = 'https://tpdedcjccygpwkofdyqg.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
+
+  const LEVEL_UP_SOUND_URL = 'https://ntz619.github.io/XP_Dashboard_prototype/universfield-level-up-04-243762.mp3';
+
+  const BASE_XP_PER_LEVEL = 100;
+  const XP_GROWTH_FACTOR = 1.18;
+  const XP_STEP_ROUNDING = 5;
+  const MIN_XP_STEP = 10;
+  const POLL_INTERVAL_MS = 5000;
+
+  const xpTableCache = [0, BASE_XP_PER_LEVEL];
+
+  let currentUsername = null;
+  let pollHandle = null;
+  let displayedTotalXp = 0;
+  let animationFrame = null;
+  let hasInitialXpLoaded = false;
+
+  const hudEl = document.getElementById('hud');
+  const barEl = document.getElementById('bar');
+  const fillEl = document.getElementById('fill');
+  const xpTextEl = document.getElementById('xpText');
+  const levelLabelEl = document.getElementById('levelLabel');
+  const levelUpPillEl = document.getElementById('levelUpPill');
+  const gainLayerEl = document.getElementById('gainLayer');
+  const sparkLayerEl = document.getElementById('sparkLayer');
+  const flashLayerEl = document.getElementById('flashLayer');
+
+  const levelUpAudio = new Audio(LEVEL_UP_SOUND_URL);
+  levelUpAudio.preload = 'auto';
+
+  function playLevelUpSound() {
+    const sound = levelUpAudio.cloneNode();
+    sound.volume = 1;
+    sound.play().catch(() => {});
+  }
+
+  function xpNeededForLevel(level) {
+    if (level <= 1) return BASE_XP_PER_LEVEL;
+    if (xpTableCache[level]) return xpTableCache[level];
+
+    for (let i = xpTableCache.length; i <= level; i++) {
+      const raw = BASE_XP_PER_LEVEL * Math.pow(XP_GROWTH_FACTOR, i - 1);
+      const rounded = Math.round(raw / XP_STEP_ROUNDING) * XP_STEP_ROUNDING;
+      const previous = xpTableCache[i - 1];
+      xpTableCache[i] = Math.max(rounded, previous + MIN_XP_STEP);
     }
 
-    :root {
-      --panel-width: min(380px, calc(100vw - 28px));
-      --bar-height: 35px;
-      --fill-slant: 12px;
-      --text-white: rgba(255, 255, 255, 0.98);
-      --track-1: rgba(89, 66, 41, 0.88);
-      --track-2: rgba(67, 48, 30, 0.92);
-      --shadow-strong: 0 7px 15px rgba(0, 0, 0, 0.30);
+    return xpTableCache[level];
+  }
+
+  function deriveLevelData(totalXp) {
+    const xp = Math.max(0, Number(totalXp) || 0);
+
+    let level = 1;
+    let remainingXp = xp;
+    let needed = xpNeededForLevel(level);
+
+    while (remainingXp >= needed) {
+      remainingXp -= needed;
+      level += 1;
+      needed = xpNeededForLevel(level);
     }
 
-    * { box-sizing: border-box; }
+    const current = remainingXp;
+    const percent = needed > 0 ? (current / needed) * 100 : 0;
 
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
+    return { xp, level, current, needed, percent };
+  }
+
+  function setFillWidth(percent) {
+    const clamped = Math.max(0, Math.min(100, percent));
+    if (clamped <= 0) {
+      fillEl.style.width = '0%';
+    } else {
+      fillEl.style.width = `calc(${clamped}% + var(--fill-slant))`;
+    }
+  }
+
+  function renderXp(totalXp) {
+    const { level, current, needed, percent } = deriveLevelData(totalXp);
+    levelLabelEl.textContent = `Level ${level}`;
+    xpTextEl.textContent = `${Math.round(current)}/${needed}`;
+    setFillWidth(percent);
+    displayedTotalXp = totalXp;
+  }
+
+  function setXpInstant(totalXp) {
+    if (animationFrame) {
+      cancelAnimationFrame(animationFrame);
+      animationFrame = null;
     }
 
-    body {
-      display: flex;
-      align-items: flex-start;
-      justify-content: flex-start;
-      padding: 13px 14px;
-      color: var(--text-white);
-      font-family: 'ObelixPro', Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      text-rendering: geometricPrecision;
-      user-select: none;
-      pointer-events: none;
-    }
+    renderXp(totalXp);
+    hasInitialXpLoaded = true;
+  }
 
-    .hud {
-      width: var(--panel-width);
-      position: relative;
-    }
+  function animateNumberToXp(targetXp, xpGain = 0) {
+    const startXp = displayedTotalXp;
+    const endXp = Math.max(0, Number(targetXp) || 0);
+    const startLevel = deriveLevelData(startXp).level;
+    const endLevel = deriveLevelData(endXp).level;
+    const duration = Math.min(1500, Math.max(650, Math.abs(endXp - startXp) * 12));
+    const startedAt = performance.now();
 
-    .level-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 5px;
-      margin: 0 0 2px 5px;
-      position: relative;
-      z-index: 3;
-    }
+    if (animationFrame) cancelAnimationFrame(animationFrame);
 
-    .level-label {
-      font-size: 11px;
-      line-height: 1;
-      letter-spacing: 0.15px;
-      text-shadow: 0 1px 5px rgba(0, 0, 0, 0.38);
-    }
+    triggerGainEffects(xpGain);
 
-    .level-up-pill {
-      opacity: 0;
-      transform: translateY(4px) scale(0.9);
-      padding: 3px 6px 2px;
-      font-size: 7px;
-      line-height: 1;
-      border-radius: 999px;
-      color: #553100;
-      background: linear-gradient(180deg, #fff8bf 0%, #ffd64a 55%, #f2ae00 100%);
-      box-shadow:
-        0 4px 9px rgba(0,0,0,0.22),
-        0 0 9px rgba(255, 216, 87, 0.65);
-    }
+    let levelFxTriggered = startLevel;
 
-    .level-up-pill.show {
-      animation: level-pill 1.4s ease forwards;
-    }
+    function frame(now) {
+      const t = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const value = startXp + (endXp - startXp) * eased;
+      const { level, current, needed, percent } = deriveLevelData(value);
 
-    .bar-shell {
-      position: relative;
-      width: 100%;
-      filter: drop-shadow(0 6px 7px rgba(0,0,0,0.22));
-    }
-
-    .bar {
-      position: relative;
-      width: 100%;
-      height: var(--bar-height);
-      overflow: hidden;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 18%),
-        linear-gradient(90deg, var(--track-1) 0%, var(--track-2) 100%);
-      box-shadow: var(--shadow-strong);
-      isolation: isolate;
-    }
-
-    .bar::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 22%, rgba(0,0,0,0.12) 100%);
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .bar::after {
-      content: '';
-      position: absolute;
-      inset: auto 8px -9px 8px;
-      height: 9px;
-      background: radial-gradient(ellipse at center, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0) 75%);
-      filter: blur(4px);
-      z-index: -1;
-    }
-
-    .fill {
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: 0%;
-      min-width: 0;
-      will-change: width, filter, transform;
-      z-index: 0;
-      overflow: visible;
-    }
-
-    .fill-shape {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.08) 24%, rgba(0,0,0,0.08) 100%),
-        linear-gradient(90deg, #f2b103 0%, #ffc400 42%, #ffc400 80%, #ffdc57 100%);
-      box-shadow:
-        inset 0 0.5px 0 rgba(255,255,255,0.22),
-        inset 0 -5px 9px rgba(204,124,0,0.10),
-        0 0 9px rgba(255, 206, 66, 0.18);
-      clip-path: polygon(0 0, 100% 0, calc(100% - var(--fill-slant)) 100%, 0 100%);
-      pointer-events: none;
-    }
-
-    .fill-shape::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.02) 34%, rgba(0,0,0,0.10) 100%);
-      pointer-events: none;
-    }
-
-    .fill::after {
-      content: '';
-      position: absolute;
-      top: -5%;
-      right: -5px;
-      width: 12.5px;
-      height: 120%;
-      transform: skewX(-22deg);
-      background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,242,173,0.84) 42%, rgba(255,211,88,0.08) 100%);
-      filter: blur(0.75px);
-      box-shadow:
-        0 0 11px rgba(255, 232, 150, 0.95),
-        -4px 0 8px rgba(255, 201, 54, 0.32);
-      opacity: 0.98;
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    .fill .sweep {
-      position: absolute;
-      inset: -4% auto -4% -15%;
-      width: 11%;
-      opacity: 0;
-      background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,252,223,0.62) 50%, rgba(255,255,255,0) 100%);
-      transform: skewX(-20deg);
-      filter: blur(2px);
-      mix-blend-mode: screen;
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .fill.animate-shimmer .sweep {
-      animation: fill-sweep 900ms ease-out 1;
-    }
-
-    .xp-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      padding: 0 8px;
-      z-index: 2;
-      pointer-events: none;
-    }
-
-    .xp-main {
-      font-size: 14px;
-      line-height: 1;
-      white-space: nowrap;
-      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-      transform-origin: left center;
-    }
-
-    .xp-main.bump {
-      animation: xp-text-bump 520ms cubic-bezier(.17,.84,.44,1);
-    }
-
-    .gain-layer,
-    .spark-layer,
-    .flash-layer {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      overflow: visible;
-      z-index: 3;
-    }
-
-    .xp-gain {
-      position: absolute;
-      right: 9px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 11px;
-      line-height: 1;
-      color: #fff7bf;
-      text-shadow:
-        0 1px 5px rgba(0,0,0,0.45),
-        0 0 7px rgba(255,227,116,0.75);
-      opacity: 0;
-      white-space: nowrap;
-    }
-
-    .xp-gain.show {
-      animation: xp-gain-float 1.25s cubic-bezier(.2,.76,.15,1) forwards;
-    }
-
-    .spark {
-      position: absolute;
-      width: 4px;
-      height: 4px;
-      border-radius: 999px;
-      background: radial-gradient(circle at 35% 35%, #fffef0 0%, #ffd95f 42%, rgba(255,186,0,0) 75%);
-      box-shadow: 0 0 6px rgba(255, 224, 112, 0.75);
-      opacity: 0;
-      transform: translate(-50%, -50%) scale(0.4);
-    }
-
-    .spark.show {
-      animation: spark-burst var(--life, 900ms) ease-out forwards;
-    }
-
-    .flash {
-      position: absolute;
-      inset: -6px;
-      opacity: 0;
-      background: radial-gradient(circle at var(--flash-x, 50%) 50%, rgba(255,245,196,0.70) 0%, rgba(255,212,83,0.18) 28%, rgba(255,212,83,0) 58%);
-      filter: blur(2px);
-    }
-
-    .flash.show {
-      animation: hit-flash 540ms ease-out forwards;
-    }
-
-    .hud.hit {
-      animation: hud-hit 540ms cubic-bezier(.19,.89,.32,1);
-    }
-
-    .bar.hit .fill {
-      animation: fill-hit 620ms cubic-bezier(.18,.89,.32,1);
-    }
-
-    @keyframes fill-sweep {
-      0%   { opacity: 0; left: -14%; }
-      12%  { opacity: 0.95; }
-      100% { opacity: 0; left: 56%; }
-    }
-
-    @keyframes xp-text-bump {
-      0%   { transform: scale(1); }
-      26%  { transform: scale(1.08); }
-      100% { transform: scale(1); }
-    }
-
-    @keyframes xp-gain-float {
-      0%   { opacity: 0; transform: translateY(-50%) translateX(0) scale(0.88); }
-      18%  { opacity: 1; transform: translateY(-86%) translateX(0) scale(1.02); }
-      70%  { opacity: 1; transform: translateY(-118%) translateX(3px) scale(1.0); }
-      100% { opacity: 0; transform: translateY(-142%) translateX(6px) scale(0.95); }
-    }
-
-    @keyframes spark-burst {
-      0% {
-        opacity: 0;
-        transform: translate(-50%, -50%) translate(0, 0) scale(0.25);
-      }
-      12% {
-        opacity: 1;
-      }
-      100% {
-        opacity: 0;
-        transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(1.1);
-      }
-    }
-
-    @keyframes hit-flash {
-      0%   { opacity: 0; transform: scale(0.96); }
-      16%  { opacity: 1; transform: scale(1.02); }
-      100% { opacity: 0; transform: scale(1.08); }
-    }
-
-    @keyframes hud-hit {
-      0%   { transform: translateX(0) scale(1); }
-      18%  { transform: translateX(1px) scale(1.008); }
-      38%  { transform: translateX(-0.5px) scale(1.004); }
-      100% { transform: translateX(0) scale(1); }
-    }
-
-    @keyframes fill-hit {
-      0%   { filter: brightness(1); }
-      30%  { filter: brightness(1.13) saturate(1.08); }
-      100% { filter: brightness(1); }
-    }
-
-    @keyframes level-pill {
-      0%   { opacity: 0; transform: translateY(4px) scale(0.9); }
-      14%  { opacity: 1; transform: translateY(0) scale(1.02); }
-      68%  { opacity: 1; transform: translateY(-2px) scale(1); }
-      100% { opacity: 0; transform: translateY(-5px) scale(0.98); }
-    }
-  </style>
-</head>
-<body>
-  <div id="hud" class="hud">
-    <div class="level-row">
-      <div id="levelLabel" class="level-label">Level 1</div>
-      <div id="levelUpPill" class="level-up-pill">LEVEL UP!</div>
-    </div>
-
-    <div class="bar-shell">
-      <div id="bar" class="bar" aria-label="XP progress">
-        <div id="fill" class="fill">
-          <div class="fill-shape"></div>
-          <div class="sweep"></div>
-        </div>
-
-        <div class="xp-overlay">
-          <div id="xpText" class="xp-main">0/100</div>
-        </div>
-
-        <div id="flashLayer" class="flash-layer"></div>
-        <div id="sparkLayer" class="spark-layer"></div>
-        <div id="gainLayer" class="gain-layer"></div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const SUPABASE_URL = 'https://tpdedcjccygpwkofdyqg.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_kYGFYlXrQHt17-uihwy7tA_CxkbQYNH';
-
-    const LEVEL_UP_SOUND_URL = 'https://ntz619.github.io/XP_Dashboard_prototype/universfield-level-up-04-243762.mp3';
-
-    const BASE_XP_PER_LEVEL = 100;
-    const XP_GROWTH_FACTOR = 1.18;
-    const XP_STEP_ROUNDING = 5;
-    const MIN_XP_STEP = 10;
-    const POLL_INTERVAL_MS = 5000;
-
-    const xpTableCache = [0, BASE_XP_PER_LEVEL];
-
-    let currentUsername = null;
-    let pollHandle = null;
-    let displayedTotalXp = 0;
-    let animationFrame = null;
-
-    const hudEl = document.getElementById('hud');
-    const barEl = document.getElementById('bar');
-    const fillEl = document.getElementById('fill');
-    const xpTextEl = document.getElementById('xpText');
-    const levelLabelEl = document.getElementById('levelLabel');
-    const levelUpPillEl = document.getElementById('levelUpPill');
-    const gainLayerEl = document.getElementById('gainLayer');
-    const sparkLayerEl = document.getElementById('sparkLayer');
-    const flashLayerEl = document.getElementById('flashLayer');
-
-    const levelUpAudio = new Audio(LEVEL_UP_SOUND_URL);
-    levelUpAudio.preload = 'auto';
-
-    function playLevelUpSound() {
-      const sound = levelUpAudio.cloneNode();
-      sound.volume = 1;
-      sound.play().catch(() => {});
-    }
-
-    function xpNeededForLevel(level) {
-      if (level <= 1) return BASE_XP_PER_LEVEL;
-      if (xpTableCache[level]) return xpTableCache[level];
-
-      for (let i = xpTableCache.length; i <= level; i++) {
-        const raw = BASE_XP_PER_LEVEL * Math.pow(XP_GROWTH_FACTOR, i - 1);
-        const rounded = Math.round(raw / XP_STEP_ROUNDING) * XP_STEP_ROUNDING;
-        const previous = xpTableCache[i - 1];
-        xpTableCache[i] = Math.max(rounded, previous + MIN_XP_STEP);
-      }
-
-      return xpTableCache[level];
-    }
-
-    function deriveLevelData(totalXp) {
-      const xp = Math.max(0, Number(totalXp) || 0);
-
-      let level = 1;
-      let remainingXp = xp;
-      let needed = xpNeededForLevel(level);
-
-      while (remainingXp >= needed) {
-        remainingXp -= needed;
-        level += 1;
-        needed = xpNeededForLevel(level);
-      }
-
-      const current = remainingXp;
-      const percent = needed > 0 ? (current / needed) * 100 : 0;
-
-      return { xp, level, current, needed, percent };
-    }
-
-    function setFillWidth(percent) {
-      const clamped = Math.max(0, Math.min(100, percent));
-      if (clamped <= 0) {
-        fillEl.style.width = '0%';
-      } else {
-        fillEl.style.width = `calc(${clamped}% + var(--fill-slant))`;
-      }
-    }
-
-    function renderXp(totalXp) {
-      const { level, current, needed, percent } = deriveLevelData(totalXp);
       levelLabelEl.textContent = `Level ${level}`;
       xpTextEl.textContent = `${Math.round(current)}/${needed}`;
       setFillWidth(percent);
-      displayedTotalXp = totalXp;
-    }
+      displayedTotalXp = value;
 
-    function animateNumberToXp(targetXp, xpGain = 0) {
-      const startXp = displayedTotalXp;
-      const endXp = Math.max(0, Number(targetXp) || 0);
-      const startLevel = deriveLevelData(startXp).level;
-      const endLevel = deriveLevelData(endXp).level;
-      const duration = Math.min(1500, Math.max(650, Math.abs(endXp - startXp) * 12));
-      const startedAt = performance.now();
-
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-
-      triggerGainEffects(xpGain);
-
-      let levelFxTriggered = startLevel;
-
-      function frame(now) {
-        const t = Math.min(1, (now - startedAt) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        const value = startXp + (endXp - startXp) * eased;
-        const { level, current, needed, percent } = deriveLevelData(value);
-
-        levelLabelEl.textContent = `Level ${level}`;
-        xpTextEl.textContent = `${Math.round(current)}/${needed}`;
-        setFillWidth(percent);
-        displayedTotalXp = value;
-
-        if (level > levelFxTriggered) {
-          levelFxTriggered = level;
-          triggerLevelUp(level);
-        }
-
-        if (t < 1) {
-          animationFrame = requestAnimationFrame(frame);
-        } else {
-          displayedTotalXp = endXp;
-          renderXp(endXp);
-          if (endLevel > startLevel) {
-            triggerLevelUp(endLevel);
-          }
-          animationFrame = null;
-        }
+      if (level > levelFxTriggered) {
+        levelFxTriggered = level;
+        triggerLevelUp(level);
       }
 
-      animationFrame = requestAnimationFrame(frame);
+      if (t < 1) {
+        animationFrame = requestAnimationFrame(frame);
+      } else {
+        displayedTotalXp = endXp;
+        renderXp(endXp);
+        if (endLevel > startLevel) {
+          triggerLevelUp(endLevel);
+        }
+        animationFrame = null;
+      }
     }
 
-    function triggerGainEffects(xpGain) {
-      const gain = Math.max(0, Number(xpGain) || 0);
+    animationFrame = requestAnimationFrame(frame);
+  }
+
+  function triggerGainEffects(xpGain) {
+    const gain = Math.max(0, Number(xpGain) || 0);
+    hudEl.classList.remove('hit');
+    barEl.classList.remove('hit');
+    fillEl.classList.remove('animate-shimmer');
+    xpTextEl.classList.remove('bump');
+
+    void hudEl.offsetWidth;
+    hudEl.classList.add('hit');
+    barEl.classList.add('hit');
+    fillEl.classList.add('animate-shimmer');
+    xpTextEl.classList.add('bump');
+
+    if (gain > 0) {
+      spawnGainText(gain);
+      spawnSparkBurst();
+      spawnFlash();
+    }
+
+    setTimeout(() => {
       hudEl.classList.remove('hit');
       barEl.classList.remove('hit');
       fillEl.classList.remove('animate-shimmer');
       xpTextEl.classList.remove('bump');
+    }, 900);
+  }
 
-      void hudEl.offsetWidth;
-      hudEl.classList.add('hit');
-      barEl.classList.add('hit');
-      fillEl.classList.add('animate-shimmer');
-      xpTextEl.classList.add('bump');
+  function spawnGainText(gain) {
+    const el = document.createElement('div');
+    el.className = 'xp-gain';
+    el.textContent = `+${gain} XP`;
+    gainLayerEl.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('show'));
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+  }
 
-      if (gain > 0) {
-        spawnGainText(gain);
-        spawnSparkBurst();
-        spawnFlash();
+  function spawnSparkBurst() {
+    const width = barEl.clientWidth;
+    const fillWidth = Math.max(9, fillEl.getBoundingClientRect().width);
+    const centerX = Math.min(width - 12, Math.max(13, fillWidth));
+    const centerY = barEl.clientHeight / 2;
+    const sparks = 12;
+
+    for (let i = 0; i < sparks; i++) {
+      const angle = (-70 + (140 / Math.max(1, sparks - 1)) * i) * (Math.PI / 180);
+      const distance = 10 + Math.random() * 21;
+      const spark = document.createElement('div');
+      spark.className = 'spark';
+      spark.style.left = `${centerX}px`;
+      spark.style.top = `${centerY}px`;
+      spark.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
+      spark.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
+      spark.style.setProperty('--life', `${650 + Math.random() * 350}ms`);
+      sparkLayerEl.appendChild(spark);
+      requestAnimationFrame(() => spark.classList.add('show'));
+      spark.addEventListener('animationend', () => spark.remove(), { once: true });
+    }
+  }
+
+  function spawnFlash() {
+    const width = barEl.clientWidth;
+    const fillWidth = Math.max(9, fillEl.getBoundingClientRect().width);
+    const x = Math.min(width - 5, Math.max(4, fillWidth));
+    const flash = document.createElement('div');
+    flash.className = 'flash';
+    flash.style.setProperty('--flash-x', `${(x / width) * 100}%`);
+    flashLayerEl.appendChild(flash);
+    requestAnimationFrame(() => flash.classList.add('show'));
+    flash.addEventListener('animationend', () => flash.remove(), { once: true });
+  }
+
+  function triggerLevelUp(level) {
+    levelUpPillEl.textContent = `LEVEL ${level}!`;
+    levelUpPillEl.classList.remove('show');
+    void levelUpPillEl.offsetWidth;
+    levelUpPillEl.classList.add('show');
+
+    playLevelUpSound();
+    spawnFlash();
+    spawnSparkBurst();
+  }
+
+  function normalizePortalsJsonish(raw) {
+    return String(raw)
+      .trim()
+      .replace(/=\s*(?=[\[{\"\-\dtruefalsen])/g, ':')
+      .replace(/\r?\n/g, ' ');
+  }
+
+  function parsePortalsMessage(rawMessage) {
+    const raw = String(rawMessage || '').trim();
+    if (!raw) throw new Error('Empty message');
+
+    const attempts = [raw, normalizePortalsJsonish(raw)];
+    for (const candidate of attempts) {
+      try {
+        const parsed = JSON.parse(candidate);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (_) {}
+    }
+
+    const usernameMatch = raw.match(/username\s*=\s*(".*?"|[^;\s]+)/i);
+    const xpGainMatch = raw.match(/xp_gain\s*=\s*(\{.*\}|".*?"|[^;\s]+)/i);
+
+    if (usernameMatch || xpGainMatch) {
+      const payload = {};
+
+      if (usernameMatch) {
+        const value = usernameMatch[1].trim();
+        payload.username = value.startsWith('"') ? JSON.parse(value) : value;
       }
 
-      setTimeout(() => {
-        hudEl.classList.remove('hit');
-        barEl.classList.remove('hit');
-        fillEl.classList.remove('animate-shimmer');
-        xpTextEl.classList.remove('bump');
-      }, 900);
-    }
-
-    function spawnGainText(gain) {
-      const el = document.createElement('div');
-      el.className = 'xp-gain';
-      el.textContent = `+${gain} XP`;
-      gainLayerEl.appendChild(el);
-      requestAnimationFrame(() => el.classList.add('show'));
-      el.addEventListener('animationend', () => el.remove(), { once: true });
-    }
-
-    function spawnSparkBurst() {
-      const width = barEl.clientWidth;
-      const fillWidth = Math.max(9, fillEl.getBoundingClientRect().width);
-      const centerX = Math.min(width - 12, Math.max(13, fillWidth));
-      const centerY = barEl.clientHeight / 2;
-      const sparks = 12;
-
-      for (let i = 0; i < sparks; i++) {
-        const angle = (-70 + (140 / Math.max(1, sparks - 1)) * i) * (Math.PI / 180);
-        const distance = 10 + Math.random() * 21;
-        const spark = document.createElement('div');
-        spark.className = 'spark';
-        spark.style.left = `${centerX}px`;
-        spark.style.top = `${centerY}px`;
-        spark.style.setProperty('--dx', `${Math.cos(angle) * distance}px`);
-        spark.style.setProperty('--dy', `${Math.sin(angle) * distance}px`);
-        spark.style.setProperty('--life', `${650 + Math.random() * 350}ms`);
-        sparkLayerEl.appendChild(spark);
-        requestAnimationFrame(() => spark.classList.add('show'));
-        spark.addEventListener('animationend', () => spark.remove(), { once: true });
-      }
-    }
-
-    function spawnFlash() {
-      const width = barEl.clientWidth;
-      const fillWidth = Math.max(9, fillEl.getBoundingClientRect().width);
-      const x = Math.min(width - 5, Math.max(4, fillWidth));
-      const flash = document.createElement('div');
-      flash.className = 'flash';
-      flash.style.setProperty('--flash-x', `${(x / width) * 100}%`);
-      flashLayerEl.appendChild(flash);
-      requestAnimationFrame(() => flash.classList.add('show'));
-      flash.addEventListener('animationend', () => flash.remove(), { once: true });
-    }
-
-    function triggerLevelUp(level) {
-      levelUpPillEl.textContent = `LEVEL ${level}!`;
-      levelUpPillEl.classList.remove('show');
-      void levelUpPillEl.offsetWidth;
-      levelUpPillEl.classList.add('show');
-
-      playLevelUpSound();
-      spawnFlash();
-      spawnSparkBurst();
-    }
-
-    function normalizePortalsJsonish(raw) {
-      return String(raw)
-        .trim()
-        .replace(/=\s*(?=[\[{\"\-\dtruefalsen])/g, ':')
-        .replace(/\r?\n/g, ' ');
-    }
-
-    function parsePortalsMessage(rawMessage) {
-      const raw = String(rawMessage || '').trim();
-      if (!raw) throw new Error('Empty message');
-
-      const attempts = [raw, normalizePortalsJsonish(raw)];
-      for (const candidate of attempts) {
-        try {
-          const parsed = JSON.parse(candidate);
-          if (parsed && typeof parsed === 'object') return parsed;
-        } catch (_) {}
+      if (xpGainMatch) {
+        const value = xpGainMatch[1].trim();
+        if (value.startsWith('{')) payload.xp_gain = JSON.parse(normalizePortalsJsonish(value));
+        else if (value.startsWith('"')) payload.xp_gain = JSON.parse(value);
+        else payload.xp_gain = Number(value);
       }
 
-      const usernameMatch = raw.match(/username\s*=\s*(".*?"|[^;\s]+)/i);
-      const xpGainMatch = raw.match(/xp_gain\s*=\s*(\{.*\}|".*?"|[^;\s]+)/i);
+      return payload;
+    }
 
-      if (usernameMatch || xpGainMatch) {
-        const payload = {};
+    throw new Error(`Could not parse Portals message: ${raw}`);
+  }
 
-        if (usernameMatch) {
-          const value = usernameMatch[1].trim();
-          payload.username = value.startsWith('"') ? JSON.parse(value) : value;
+  function extractXpGain(payload) {
+    const username = typeof payload.username === 'string' ? payload.username : null;
+    let xpGain = payload.xp_gain;
+
+    if (xpGain && typeof xpGain === 'object' && !Array.isArray(xpGain)) {
+      if (!username) throw new Error('xp_gain arrived as a player-variable map, but no username was present');
+      xpGain = xpGain[username];
+    }
+
+    const numeric = Number(xpGain);
+    if (!Number.isFinite(numeric)) throw new Error(`xp_gain is not a valid number: ${xpGain}`);
+    return Math.max(0, Math.floor(numeric));
+  }
+
+  function buildHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_KEY,
+    };
+
+    if (!SUPABASE_KEY.startsWith('sb_publishable_')) {
+      headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
+    }
+
+    return headers;
+  }
+
+  async function callRpc(fnName, body) {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+
+    const text = await response.text();
+    let data = null;
+
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = text;
+    }
+
+    if (!response.ok) {
+      const message = data && typeof data === 'object'
+        ? (data.message || JSON.stringify(data))
+        : String(data || response.statusText);
+      throw new Error(message);
+    }
+
+    return data;
+  }
+
+  function firstRow(data) {
+    return Array.isArray(data) ? data[0] : data;
+  }
+
+  async function getPlayerProgress(username) {
+    const data = await callRpc('get_player_progress', { p_username: username });
+    return firstRow(data);
+  }
+
+  async function addPlayerXp(username, xpGain) {
+    const data = await callRpc('add_player_xp', {
+      p_username: username,
+      p_xp_gain: xpGain,
+    });
+    return firstRow(data);
+  }
+
+  async function refreshCurrentPlayer() {
+    if (!currentUsername) return;
+
+    try {
+      const row = await getPlayerProgress(currentUsername);
+      if (row && typeof row.xp !== 'undefined') {
+        const nextXp = Number(row.xp) || 0;
+
+        if (!hasInitialXpLoaded) {
+          setXpInstant(nextXp);
+        } else {
+          renderXp(nextXp);
         }
-
-        if (xpGainMatch) {
-          const value = xpGainMatch[1].trim();
-          if (value.startsWith('{')) payload.xp_gain = JSON.parse(normalizePortalsJsonish(value));
-          else if (value.startsWith('"')) payload.xp_gain = JSON.parse(value);
-          else payload.xp_gain = Number(value);
-        }
-
-        return payload;
       }
+    } catch (_) {}
+  }
 
-      throw new Error(`Could not parse Portals message: ${raw}`);
-    }
+  function startPolling() {
+    if (pollHandle) clearInterval(pollHandle);
+    pollHandle = setInterval(refreshCurrentPlayer, POLL_INTERVAL_MS);
+  }
 
-    function extractXpGain(payload) {
+  async function handlePortalsMessage(message) {
+    try {
+      const payload = parsePortalsMessage(message);
       const username = typeof payload.username === 'string' ? payload.username : null;
-      let xpGain = payload.xp_gain;
+      if (!username) throw new Error('Missing username in Portals message');
 
-      if (xpGain && typeof xpGain === 'object' && !Array.isArray(xpGain)) {
-        if (!username) throw new Error('xp_gain arrived as a player-variable map, but no username was present');
-        xpGain = xpGain[username];
+      const xpGain = extractXpGain(payload);
+      currentUsername = username;
+
+      const row = await addPlayerXp(username, xpGain);
+      if (!row || typeof row.xp === 'undefined') throw new Error('RPC returned no player row');
+
+      const nextXp = Number(row.xp) || 0;
+
+      if (!hasInitialXpLoaded) {
+        setXpInstant(nextXp);
+      } else {
+        animateNumberToXp(nextXp, xpGain);
       }
 
-      const numeric = Number(xpGain);
-      if (!Number.isFinite(numeric)) throw new Error(`xp_gain is not a valid number: ${xpGain}`);
-      return Math.max(0, Math.floor(numeric));
+      startPolling();
+    } catch (_) {}
+  }
+
+  window.handlePortalsMessage = handlePortalsMessage;
+
+  renderXp(0);
+
+  PortalsSdk.setMessageListener((message) => {
+    handlePortalsMessage(message);
+  });
+
+  window.addEventListener('message', (event) => {
+    if (typeof event.data === 'string') {
+      // fallback listener kept for browser/dev environments
     }
-
-    function buildHeaders() {
-      const headers = {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_KEY,
-      };
-
-      if (!SUPABASE_KEY.startsWith('sb_publishable_')) {
-        headers['Authorization'] = `Bearer ${SUPABASE_KEY}`;
-      }
-
-      return headers;
-    }
-
-    async function callRpc(fnName, body) {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
-        method: 'POST',
-        headers: buildHeaders(),
-        body: JSON.stringify(body),
-        cache: 'no-store',
-      });
-
-      const text = await response.text();
-      let data = null;
-
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {
-        data = text;
-      }
-
-      if (!response.ok) {
-        const message = data && typeof data === 'object'
-          ? (data.message || JSON.stringify(data))
-          : String(data || response.statusText);
-        throw new Error(message);
-      }
-
-      return data;
-    }
-
-    function firstRow(data) {
-      return Array.isArray(data) ? data[0] : data;
-    }
-
-    async function getPlayerProgress(username) {
-      const data = await callRpc('get_player_progress', { p_username: username });
-      return firstRow(data);
-    }
-
-    async function addPlayerXp(username, xpGain) {
-      const data = await callRpc('add_player_xp', {
-        p_username: username,
-        p_xp_gain: xpGain,
-      });
-      return firstRow(data);
-    }
-
-    async function refreshCurrentPlayer() {
-      if (!currentUsername) return;
-
-      try {
-        const row = await getPlayerProgress(currentUsername);
-        if (row && typeof row.xp !== 'undefined') {
-          renderXp(Number(row.xp) || 0);
-        }
-      } catch (_) {}
-    }
-
-    function startPolling() {
-      if (pollHandle) clearInterval(pollHandle);
-      pollHandle = setInterval(refreshCurrentPlayer, POLL_INTERVAL_MS);
-    }
-
-    async function handlePortalsMessage(message) {
-      try {
-        const payload = parsePortalsMessage(message);
-        const username = typeof payload.username === 'string' ? payload.username : null;
-        if (!username) throw new Error('Missing username in Portals message');
-
-        const xpGain = extractXpGain(payload);
-        currentUsername = username;
-
-        const row = await addPlayerXp(username, xpGain);
-        if (!row || typeof row.xp === 'undefined') throw new Error('RPC returned no player row');
-
-        animateNumberToXp(Number(row.xp) || 0, xpGain);
-        startPolling();
-      } catch (_) {}
-    }
-
-    window.handlePortalsMessage = handlePortalsMessage;
-
-    renderXp(0);
-
-    PortalsSdk.setMessageListener((message) => {
-      handlePortalsMessage(message);
-    });
-
-    window.addEventListener('message', (event) => {
-      if (typeof event.data === 'string') {
-        // fallback listener kept for browser/dev environments
-      }
-    });
-  </script>
-</body>
-</html>
+  });
+</script>
