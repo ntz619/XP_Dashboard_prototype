@@ -381,6 +381,21 @@
 
   const xpTableCache = [0, BASE_XP_PER_LEVEL];
 
+  const WIN_FIELDS = [
+  'wins_quadclaim',
+  'wins_memoryclaim',
+  'wins_gunspleef',
+  'wins_runspleef'
+  ];
+  
+  let currentWins = {
+    wins_quadclaim: 0,
+    wins_memoryclaim: 0,
+    wins_gunspleef: 0,
+    wins_runspleef: 0
+  };
+
+  let playerCreatedAt = null;
   let currentUsername = null;
   let currentPetId = null;
   let pollHandle = null;
@@ -459,11 +474,25 @@
 
   function applyPlayerRow(row) {
     if (!row || typeof row !== 'object') return;
+  
     const nextXp = Number(row.xp) || 0;
     renderXp(nextXp);
     displayedTotalXp = nextXp;
+  
     currentPetId = row.pet_id == null ? null : Number(row.pet_id);
     window.currentPetId = currentPetId;
+  
+    currentWins = {
+      wins_quadclaim: Number(row.wins_quadclaim) || 0,
+      wins_memoryclaim: Number(row.wins_memoryclaim) || 0,
+      wins_gunspleef: Number(row.wins_gunspleef) || 0,
+      wins_runspleef: Number(row.wins_runspleef) || 0
+    };
+  
+    playerCreatedAt = row.created_at || null;
+  
+    window.currentWins = currentWins;
+    window.playerCreatedAt = playerCreatedAt;
   }
 
   function setXpInstant(totalXp) {
@@ -724,6 +753,16 @@
     return firstRow(data);
   }
 
+  async function addPlayerWin(username, winKey, winGain = 1) {
+    const data = await callRpc('add_player_win', {
+      p_username: username,
+      p_win_key: winKey,
+      p_win_gain: winGain,
+    });
+  
+    return firstRow(data);
+  }
+    
   async function setPlayerPet(username, petId) {
     const data = await callRpc('set_player_pet', {
       p_username: username,
@@ -761,6 +800,7 @@
 
       const hasXpGain = hasOwn(payload, 'xp_gain');
       const hasPetId = hasOwn(payload, 'pet_id');
+      const winFieldsInPayload = WIN_FIELDS.filter((field) => hasOwn(payload, field));
 
       let latestRow = null;
 
@@ -769,6 +809,14 @@
         latestRow = await setPlayerPet(username, petId);
       }
 
+      for (const winField of winFieldsInPayload) {
+        const winGain = Math.max(0, extractFieldValue(payload, winField));
+      
+        if (winGain > 0) {
+          latestRow = await addPlayerWin(username, winField, winGain);
+        }
+      }
+      
       if (hasXpGain) {
         const xpGain = Math.max(0, extractFieldValue(payload, 'xp_gain'));
         latestRow = await addPlayerXp(username, xpGain);
@@ -783,9 +831,11 @@
           window.currentPetId = currentPetId;
           animateNumberToXp(nextXp, xpGain);
         }
-      } else if (latestRow) {
-        applyPlayerRow(latestRow);
-        hasInitialXpLoaded = true;
+      } else if (latestRow || winFieldsInPayload.length > 0) {
+        if (latestRow) {
+          applyPlayerRow(latestRow);
+          hasInitialXpLoaded = true;
+        }
       } else {
         latestRow = await getPlayerProgress(username);
         applyPlayerRow(latestRow);
