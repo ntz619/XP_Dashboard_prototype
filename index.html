@@ -650,33 +650,55 @@
     const xpGainMatch = raw.match(/xp_gain\s*=\s*(\{.*\}|\".*?\"|[^;\s]+)/i);
     const petIdMatch = raw.match(/pet_id\s*=\s*(\{.*\}|\".*?\"|[^;\s]+)/i);
 
-    if (usernameMatch || xpGainMatch || petIdMatch) {
-      const payload = {};
-
-      if (usernameMatch) {
-        const value = usernameMatch[1].trim();
-        payload.username = value.startsWith('"') ? JSON.parse(value) : value;
+    const fallbackFields = [
+      'xp_gain',
+      'pet_id',
+      'source_game',
+      'seen',
+      'plays_quadclaim',
+      'plays_memoryclaim',
+      'plays_gunspleef',
+      'plays_runspleef',
+      'wins_quadclaim',
+      'wins_memoryclaim',
+      'wins_gunspleef',
+      'wins_runspleef'
+    ];
+    
+    const payload = {};
+    
+    if (usernameMatch) {
+      const value = usernameMatch[1].trim();
+      payload.username = value.startsWith('"') ? JSON.parse(value) : value;
+    }
+    
+    for (const field of fallbackFields) {
+      const match = raw.match(new RegExp(`${field}\\\\s*=\\\\s*(\\\\{.*\\\\}|\\".*?\\"|[^;\\\\s]+)`, 'i'));
+    
+      if (!match) continue;
+    
+      const value = match[1].trim();
+    
+      if (value.startsWith('{')) {
+        payload[field] = JSON.parse(normalizePortalsJsonish(value));
+      } else if (value.startsWith('"')) {
+        payload[field] = JSON.parse(value);
+      } else if (value === 'true') {
+        payload[field] = true;
+      } else if (value === 'false') {
+        payload[field] = false;
+      } else if (!Number.isNaN(Number(value))) {
+        payload[field] = Number(value);
+      } else {
+        payload[field] = value;
       }
-
-      if (xpGainMatch) {
-        const value = xpGainMatch[1].trim();
-        if (value.startsWith('{')) payload.xp_gain = JSON.parse(normalizePortalsJsonish(value));
-        else if (value.startsWith('"')) payload.xp_gain = JSON.parse(value);
-        else payload.xp_gain = Number(value);
-      }
-
-      if (petIdMatch) {
-        const value = petIdMatch[1].trim();
-        if (value.startsWith('{')) payload.pet_id = JSON.parse(normalizePortalsJsonish(value));
-        else if (value.startsWith('"')) payload.pet_id = JSON.parse(value);
-        else payload.pet_id = Number(value);
-      }
-
+    }
+    
+    if (Object.keys(payload).length > 0) {
       return payload;
     }
-
+    
     throw new Error(`Could not parse Portals message: ${raw}`);
-  }
 
   function extractFieldValue(payload, fieldName) {
     const username = typeof payload.username === 'string' ? payload.username : null;
@@ -745,31 +767,175 @@
     return firstRow(data);
   }
 
-  async function addPlayerXp(username, xpGain) {
-    const data = await callRpc('add_player_xp', {
-      p_username: username,
-      p_xp_gain: xpGain,
-    });
-    return firstRow(data);
+  const PATCH_NUMERIC_FIELDS = [
+  'xp_gain',
+  'pet_id',
+
+  'plays_quadclaim',
+  'plays_memoryclaim',
+  'plays_gunspleef',
+  'plays_runspleef',
+
+  'wins_quadclaim',
+  'wins_memoryclaim',
+  'wins_gunspleef',
+  'wins_runspleef'
+];
+
+const COUNTER_FIELDS = [
+  'plays_quadclaim',
+  'plays_memoryclaim',
+  'plays_gunspleef',
+  'plays_runspleef',
+  'wins_quadclaim',
+  'wins_memoryclaim',
+  'wins_gunspleef',
+  'wins_runspleef'
+];
+
+let currentStats = {
+  plays_quadclaim: 0,
+  plays_memoryclaim: 0,
+  plays_gunspleef: 0,
+  plays_runspleef: 0,
+  wins_quadclaim: 0,
+  wins_memoryclaim: 0,
+  wins_gunspleef: 0,
+  wins_runspleef: 0,
+  daily_login_streak: 0,
+  best_login_streak: 0,
+  active_days_total: 0,
+  last_login_date: null,
+  first_game_played: null,
+  last_game_played: null,
+  favorite_game: null,
+  created_at: null,
+  updated_at: null,
+  last_seen_at: null
+};
+
+function getPayloadValue(payload, fieldName) {
+  const username = typeof payload.username === 'string' ? payload.username : null;
+  let value = payload[fieldName];
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (!username) throw new Error(`${fieldName} arrived as a player-variable map, but no username was present`);
+    value = value[username];
   }
 
-  async function addPlayerWin(username, winKey, winGain = 1) {
-    const data = await callRpc('add_player_win', {
-      p_username: username,
-      p_win_key: winKey,
-      p_win_gain: winGain,
-    });
-  
-    return firstRow(data);
+  return value;
+}
+
+function extractNumericField(payload, fieldName) {
+  const value = getPayloadValue(payload, fieldName);
+  const numeric = Number(value);
+
+  if (!Number.isFinite(numeric)) {
+    throw new Error(`${fieldName} is not a valid number: ${value}`);
   }
-    
-  async function setPlayerPet(username, petId) {
-    const data = await callRpc('set_player_pet', {
-      p_username: username,
-      p_pet_id: petId,
-    });
-    return firstRow(data);
+
+  return Math.floor(numeric);
+}
+
+function extractStringField(payload, fieldName) {
+  const value = getPayloadValue(payload, fieldName);
+  if (value == null) return null;
+  return String(value).trim() || null;
+}
+
+function extractBooleanField(payload, fieldName) {
+  const value = getPayloadValue(payload, fieldName);
+
+  if (value === true || value === 'true' || value === 1 || value === '1') return true;
+  if (value === false || value === 'false' || value === 0 || value === '0') return false;
+
+  return Boolean(value);
+}
+
+function buildPatchBody(payload) {
+  const username = typeof payload.username === 'string' ? payload.username.trim() : '';
+
+  if (!username) {
+    throw new Error('Missing username in Portals message');
   }
+
+  const body = {
+    p_username: username
+  };
+
+  if (hasOwn(payload, 'source_game')) {
+    body.p_source_game = extractStringField(payload, 'source_game');
+  }
+
+  if (hasOwn(payload, 'seen')) {
+    body.p_seen = extractBooleanField(payload, 'seen');
+  }
+
+  if (hasOwn(payload, 'xp_gain')) {
+    body.p_xp_gain = Math.max(0, extractNumericField(payload, 'xp_gain'));
+  }
+
+  if (hasOwn(payload, 'pet_id')) {
+    body.p_pet_id = extractNumericField(payload, 'pet_id');
+  }
+
+  for (const field of COUNTER_FIELDS) {
+    if (hasOwn(payload, field)) {
+      body[`p_${field}`] = Math.max(0, extractNumericField(payload, field));
+    }
+  }
+
+  return body;
+}
+
+async function patchPlayerProgress(payload) {
+  const body = buildPatchBody(payload);
+  const data = await callRpc('patch_player_progress', body);
+  return firstRow(data);
+}
+
+async function getPlayerProgress(username) {
+  const data = await callRpc('get_player_progress', { p_username: username });
+  return firstRow(data);
+}
+
+function applyPlayerRow(row) {
+  if (!row || typeof row !== 'object') return;
+
+  const nextXp = Number(row.xp) || 0;
+  renderXp(nextXp);
+  displayedTotalXp = nextXp;
+
+  currentPetId = row.pet_id == null ? null : Number(row.pet_id);
+  window.currentPetId = currentPetId;
+
+  currentStats = {
+    plays_quadclaim: Number(row.plays_quadclaim) || 0,
+    plays_memoryclaim: Number(row.plays_memoryclaim) || 0,
+    plays_gunspleef: Number(row.plays_gunspleef) || 0,
+    plays_runspleef: Number(row.plays_runspleef) || 0,
+
+    wins_quadclaim: Number(row.wins_quadclaim) || 0,
+    wins_memoryclaim: Number(row.wins_memoryclaim) || 0,
+    wins_gunspleef: Number(row.wins_gunspleef) || 0,
+    wins_runspleef: Number(row.wins_runspleef) || 0,
+
+    daily_login_streak: Number(row.daily_login_streak) || 0,
+    best_login_streak: Number(row.best_login_streak) || 0,
+    active_days_total: Number(row.active_days_total) || 0,
+
+    last_login_date: row.last_login_date || null,
+    first_game_played: row.first_game_played || null,
+    last_game_played: row.last_game_played || null,
+    favorite_game: row.favorite_game || null,
+
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+    last_seen_at: row.last_seen_at || null
+  };
+
+  window.currentStats = currentStats;
+}
 
   async function refreshCurrentPlayer() {
     if (!currentUsername) return;
@@ -790,61 +956,53 @@
     pollHandle = setInterval(refreshCurrentPlayer, POLL_INTERVAL_MS);
   }
 
-  async function handlePortalsMessage(message) {
-    try {
-      const payload = parsePortalsMessage(message);
-      const username = typeof payload.username === 'string' ? payload.username : null;
-      if (!username) throw new Error('Missing username in Portals message');
+ async function handlePortalsMessage(message) {
+  try {
+    const payload = parsePortalsMessage(message);
+    const username = typeof payload.username === 'string' ? payload.username : null;
 
-      currentUsername = username;
+    if (!username) {
+      throw new Error('Missing username in Portals message');
+    }
 
-      const hasXpGain = hasOwn(payload, 'xp_gain');
-      const hasPetId = hasOwn(payload, 'pet_id');
-      const winFieldsInPayload = WIN_FIELDS.filter((field) => hasOwn(payload, field));
+    currentUsername = username;
 
-      let latestRow = null;
+    const hasXpGain = hasOwn(payload, 'xp_gain');
+    const xpGain = hasXpGain ? Math.max(0, extractNumericField(payload, 'xp_gain')) : 0;
 
-      if (hasPetId) {
-        const petId = extractFieldValue(payload, 'pet_id');
-        latestRow = await setPlayerPet(username, petId);
-      }
+    const latestRow = await patchPlayerProgress(payload);
 
-      for (const winField of winFieldsInPayload) {
-        const winGain = Math.max(0, extractFieldValue(payload, winField));
-      
-        if (winGain > 0) {
-          latestRow = await addPlayerWin(username, winField, winGain);
+    if (!latestRow || typeof latestRow.xp === 'undefined') {
+      throw new Error('patch_player_progress returned no player row');
+    }
+
+    const nextXp = Number(latestRow.xp) || 0;
+
+    if (!hasInitialXpLoaded) {
+      applyPlayerRow(latestRow);
+      hasInitialXpLoaded = true;
+    } else if (hasXpGain && xpGain > 0) {
+      currentPetId = latestRow.pet_id == null ? currentPetId : Number(latestRow.pet_id);
+      window.currentPetId = currentPetId;
+
+      for (const field of Object.keys(currentStats)) {
+        if (field in latestRow) {
+          currentStats[field] = latestRow[field];
         }
       }
-      
-      if (hasXpGain) {
-        const xpGain = Math.max(0, extractFieldValue(payload, 'xp_gain'));
-        latestRow = await addPlayerXp(username, xpGain);
 
-        const nextXp = Number(latestRow?.xp) || 0;
+      window.currentStats = currentStats;
+      animateNumberToXp(nextXp, xpGain);
+    } else {
+      applyPlayerRow(latestRow);
+      hasInitialXpLoaded = true;
+    }
 
-        if (!hasInitialXpLoaded) {
-          applyPlayerRow(latestRow);
-          hasInitialXpLoaded = true;
-        } else {
-          currentPetId = latestRow?.pet_id == null ? currentPetId : Number(latestRow.pet_id);
-          window.currentPetId = currentPetId;
-          animateNumberToXp(nextXp, xpGain);
-        }
-      } else if (latestRow || winFieldsInPayload.length > 0) {
-        if (latestRow) {
-          applyPlayerRow(latestRow);
-          hasInitialXpLoaded = true;
-        }
-      } else {
-        latestRow = await getPlayerProgress(username);
-        applyPlayerRow(latestRow);
-        hasInitialXpLoaded = true;
-      }
-
-      startPolling();
-    } catch (_) {}
+    startPolling();
+  } catch (error) {
+    console.error('Portals message handling failed:', error, message);
   }
+}
 
   window.handlePortalsMessage = handlePortalsMessage;
 
