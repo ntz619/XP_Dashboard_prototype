@@ -306,9 +306,7 @@
         opacity: 0;
         transform: translate(-50%, -50%) translate(0, 0) scale(0.25);
       }
-      12% {
-        opacity: 1;
-      }
+      12% { opacity: 1; }
       100% {
         opacity: 0;
         transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(1.1);
@@ -490,6 +488,29 @@
       displayedTotalXp = Number(totalXp) || 0;
     }
 
+    function statsFromRow(row) {
+      return {
+        plays_quadclaim: Number(row.plays_quadclaim) || 0,
+        plays_memoryclaim: Number(row.plays_memoryclaim) || 0,
+        plays_gunspleef: Number(row.plays_gunspleef) || 0,
+        plays_runspleef: Number(row.plays_runspleef) || 0,
+        wins_quadclaim: Number(row.wins_quadclaim) || 0,
+        wins_memoryclaim: Number(row.wins_memoryclaim) || 0,
+        wins_gunspleef: Number(row.wins_gunspleef) || 0,
+        wins_runspleef: Number(row.wins_runspleef) || 0,
+        daily_login_streak: Number(row.daily_login_streak) || 0,
+        best_login_streak: Number(row.best_login_streak) || 0,
+        active_days_total: Number(row.active_days_total) || 0,
+        last_login_date: row.last_login_date || null,
+        first_game_played: row.first_game_played || null,
+        last_game_played: row.last_game_played || null,
+        favorite_game: row.favorite_game || null,
+        created_at: row.created_at || null,
+        updated_at: row.updated_at || null,
+        last_seen_at: row.last_seen_at || null
+      };
+    }
+
     function applyPlayerRow(row) {
       if (!row || typeof row !== 'object') return;
 
@@ -500,31 +521,7 @@
       currentPetId = row.pet_id == null ? null : Number(row.pet_id);
       window.currentPetId = currentPetId;
 
-      currentStats = {
-        plays_quadclaim: Number(row.plays_quadclaim) || 0,
-        plays_memoryclaim: Number(row.plays_memoryclaim) || 0,
-        plays_gunspleef: Number(row.plays_gunspleef) || 0,
-        plays_runspleef: Number(row.plays_runspleef) || 0,
-
-        wins_quadclaim: Number(row.wins_quadclaim) || 0,
-        wins_memoryclaim: Number(row.wins_memoryclaim) || 0,
-        wins_gunspleef: Number(row.wins_gunspleef) || 0,
-        wins_runspleef: Number(row.wins_runspleef) || 0,
-
-        daily_login_streak: Number(row.daily_login_streak) || 0,
-        best_login_streak: Number(row.best_login_streak) || 0,
-        active_days_total: Number(row.active_days_total) || 0,
-
-        last_login_date: row.last_login_date || null,
-        first_game_played: row.first_game_played || null,
-        last_game_played: row.last_game_played || null,
-        favorite_game: row.favorite_game || null,
-
-        created_at: row.created_at || null,
-        updated_at: row.updated_at || null,
-        last_seen_at: row.last_seen_at || null
-      };
-
+      currentStats = statsFromRow(row);
       window.currentStats = currentStats;
     }
 
@@ -534,31 +531,7 @@
       currentPetId = row.pet_id == null ? currentPetId : Number(row.pet_id);
       window.currentPetId = currentPetId;
 
-      currentStats = {
-        plays_quadclaim: Number(row.plays_quadclaim) || 0,
-        plays_memoryclaim: Number(row.plays_memoryclaim) || 0,
-        plays_gunspleef: Number(row.plays_gunspleef) || 0,
-        plays_runspleef: Number(row.plays_runspleef) || 0,
-
-        wins_quadclaim: Number(row.wins_quadclaim) || 0,
-        wins_memoryclaim: Number(row.wins_memoryclaim) || 0,
-        wins_gunspleef: Number(row.wins_gunspleef) || 0,
-        wins_runspleef: Number(row.wins_runspleef) || 0,
-
-        daily_login_streak: Number(row.daily_login_streak) || 0,
-        best_login_streak: Number(row.best_login_streak) || 0,
-        active_days_total: Number(row.active_days_total) || 0,
-
-        last_login_date: row.last_login_date || null,
-        first_game_played: row.first_game_played || null,
-        last_game_played: row.last_game_played || null,
-        favorite_game: row.favorite_game || null,
-
-        created_at: row.created_at || null,
-        updated_at: row.updated_at || null,
-        last_seen_at: row.last_seen_at || null
-      };
-
+      currentStats = statsFromRow(row);
       window.currentStats = currentStats;
     }
 
@@ -709,6 +682,8 @@
 
       const fallbackFields = [
         'xp_gain',
+        'xp_source',
+        'event_id',
         'pet_id',
         'source_game',
         'seen',
@@ -808,12 +783,18 @@
         throw new Error('Missing username in Portals message');
       }
 
-      const body = {
-        p_username: username
-      };
+      const body = { p_username: username };
 
       if (hasOwn(payload, 'source_game')) {
         body.p_source_game = extractStringField(payload, 'source_game');
+      }
+
+      if (hasOwn(payload, 'xp_source')) {
+        body.p_xp_source = extractStringField(payload, 'xp_source');
+      }
+
+      if (hasOwn(payload, 'event_id')) {
+        body.p_event_id = extractStringField(payload, 'event_id');
       }
 
       if (hasOwn(payload, 'seen')) {
@@ -938,7 +919,7 @@
         if (!hasInitialXpLoaded) {
           applyPlayerRow(latestRow);
           hasInitialXpLoaded = true;
-        } else if (hasXpGain && xpGain > 0) {
+        } else if (hasXpGain && xpGain > 0 && nextXp !== displayedTotalXp) {
           updateStatsWithoutRenderingXp(latestRow);
           animateNumberToXp(nextXp, xpGain);
         } else {
