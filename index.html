@@ -678,12 +678,11 @@
         } catch (_) {}
       }
 
-      const usernameMatch = raw.match(/username\s*=\s*(\".*?\"|[^;\s]+)/i);
+      const usernameMatch = raw.match(/username\s*=\s*(\".*?\"|[^\s;]+)/i);
 
       const fallbackFields = [
         'xp_gain',
         'xp_source',
-        'event_id',
         'pet_id',
         'source_game',
         'seen',
@@ -791,10 +790,6 @@
 
       if (hasOwn(payload, 'xp_source')) {
         body.p_xp_source = extractStringField(payload, 'xp_source');
-      }
-
-      if (hasOwn(payload, 'event_id')) {
-        body.p_event_id = extractStringField(payload, 'event_id');
       }
 
       if (hasOwn(payload, 'seen')) {
