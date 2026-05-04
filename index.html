@@ -73,6 +73,26 @@
       text-shadow: 0 1px 5px rgba(0, 0, 0, 0.38);
     }
 
+    /* ── Daily login streak pill ───────────────── */
+    .streak-pill {
+      display: none;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 7px 2px;
+      font-size: 7px;
+      line-height: 1;
+      border-radius: 999px;
+      color: #3d1000;
+      background: linear-gradient(180deg, #fff0cc 0%, #ffb347 55%, #ff5e00 100%);
+      box-shadow:
+        0 4px 9px rgba(0, 0, 0, 0.22),
+        0 0 9px rgba(255, 110, 0, 0.50);
+    }
+
+    .streak-pill.active {
+      display: flex;
+    }
+
     /* ── XP Multiplier pill ─────────────────────── */
     .multiplier-pill {
       display: none;
@@ -372,6 +392,9 @@
         <span id="multiplierLabel">2.0X XP</span>
         <span id="multiplierTimer" class="multiplier-timer"></span>
       </div>
+      <div id="streakPill" class="streak-pill">
+        <span id="streakLabel">🔥 1</span>
+      </div>
       <div id="levelUpPill" class="level-up-pill">LEVEL UP!</div>
     </div>
 
@@ -443,6 +466,8 @@
     const multiplierPillEl  = document.getElementById('multiplierPill');
     const multiplierLabelEl = document.getElementById('multiplierLabel');
     const multiplierTimerEl = document.getElementById('multiplierTimer');
+    const streakPillEl      = document.getElementById('streakPill');
+    const streakLabelEl     = document.getElementById('streakLabel');
     const gainLayerEl     = document.getElementById('gainLayer');
     const sparkLayerEl    = document.getElementById('sparkLayer');
     const flashLayerEl    = document.getElementById('flashLayer');
@@ -527,6 +552,19 @@
       multiplierInterval = setInterval(tick, 1000);
     }
 
+    // ── Daily login streak display ──────────────────────────
+
+    function updateStreakDisplay(row) {
+      if (!row) return;
+      const streak = Number(row.daily_login_streak) || 0;
+      if (streak > 0) {
+        streakLabelEl.textContent = `🔥 ${streak}`;
+        streakPillEl.classList.add('active');
+      } else {
+        streakPillEl.classList.remove('active');
+      }
+    }
+
     // ── Row helpers ─────────────────────────────────────────
 
     function statsFromRow(row) {
@@ -562,6 +600,7 @@
       currentStats = statsFromRow(row);
       window.currentStats = currentStats;
       updateMultiplierDisplay(row);
+      updateStreakDisplay(row);
     }
 
     function updateStatsWithoutRenderingXp(row) {
@@ -571,6 +610,7 @@
       currentStats = statsFromRow(row);
       window.currentStats = currentStats;
       updateMultiplierDisplay(row);
+      updateStreakDisplay(row);
     }
 
     // ── Animations ──────────────────────────────────────────
@@ -872,3 +912,4 @@
   </script>
 </body>
 </html>
+
