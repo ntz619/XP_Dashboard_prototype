@@ -382,6 +382,144 @@
       68%  { opacity: 1; transform: translateY(-2px) scale(1); }
       100% { opacity: 0; transform: translateY(-5px) scale(0.98); }
     }
+
+    /* ── Achievement toast ──────────────────────── */
+    .ach-toast {
+      position: fixed;
+      left: 14px;
+      width: var(--panel-width);
+      background: linear-gradient(135deg, rgba(45,28,6,0.97) 0%, rgba(28,16,2,0.99) 100%);
+      border-radius: 6px;
+      border: 1px solid rgba(255,196,0,0.18);
+      border-left: 3px solid var(--ach-accent, var(--gold-2));
+      box-shadow:
+        0 6px 24px rgba(0,0,0,0.60),
+        var(--ach-glow, none);
+      padding: 8px 12px 10px 10px;
+      pointer-events: none;
+      z-index: 999;
+      overflow: hidden;
+      transform: translateX(calc(-100% - 20px));
+      opacity: 0;
+    }
+
+    .ach-toast.ach-enter {
+      transition:
+        transform 500ms cubic-bezier(0.34, 1.45, 0.64, 1),
+        opacity   280ms ease;
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .ach-toast.ach-exit {
+      transition:
+        transform 360ms cubic-bezier(0.55, 0, 1, 0.45),
+        opacity   360ms ease-in;
+      transform: translateX(calc(-100% - 20px));
+      opacity: 0;
+    }
+
+    /* shimmer sweep across toast on entry */
+    .ach-toast-shimmer {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        105deg,
+        transparent 25%,
+        rgba(255,255,255,0.07) 50%,
+        transparent 75%
+      );
+      transform: translateX(-100%);
+      pointer-events: none;
+    }
+    .ach-toast-shimmer.run {
+      animation: ach-shimmer 650ms ease-out 400ms 1 forwards;
+    }
+
+    @keyframes ach-shimmer {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(220%); }
+    }
+
+    .ach-toast-top {
+      font-size: 6.5px;
+      letter-spacing: 1.8px;
+      color: rgba(255,196,0,0.50);
+      margin-bottom: 5px;
+    }
+
+    .ach-toast-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ach-toast-icon {
+      font-size: 26px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .ach-toast-name {
+      font-size: 12px;
+      color: var(--gold-1);
+      text-shadow: 0 1px 5px rgba(255,196,0,0.35);
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ach-toast-desc {
+      font-size: 7.5px;
+      color: rgba(255,255,255,0.38);
+      margin-top: 2px;
+      line-height: 1.2;
+    }
+
+    .ach-toast-rarity {
+      font-size: 6.5px;
+      letter-spacing: 1px;
+      margin-top: 3px;
+    }
+    .ach-toast-rarity.legendary { color: #ffd700; }
+    .ach-toast-rarity.epic      { color: #c77dff; }
+    .ach-toast-rarity.rare      { color: #4da6ff; }
+    .ach-toast-rarity.common    { color: rgba(255,255,255,0.28); }
+
+    /* drain bar across the bottom showing time remaining */
+    .ach-toast-bar {
+      position: absolute;
+      bottom: 0; left: 0;
+      height: 2px;
+      width: 100%;
+      background: var(--ach-accent, var(--gold-2));
+      opacity: 0.40;
+      transform-origin: left center;
+    }
+    .ach-toast-bar.run {
+      animation: ach-bar-drain var(--ach-dur, 3500ms) linear var(--ach-bar-delay, 480ms) both;
+    }
+
+    @keyframes ach-bar-drain {
+      from { transform: scaleX(1); }
+      to   { transform: scaleX(0); }
+    }
+
+    /* legendary extra pulse ring */
+    .ach-toast-pulse {
+      position: absolute;
+      inset: -1px;
+      border-radius: 6px;
+      border: 1px solid var(--ach-accent, transparent);
+      opacity: 0;
+      pointer-events: none;
+      animation: ach-pulse 900ms ease-out 500ms 1 forwards;
+    }
+    @keyframes ach-pulse {
+      0%   { opacity: 0.6; transform: scale(1.00); }
+      100% { opacity: 0;   transform: scale(1.04); }
+    }
   </style>
 </head>
 <body>
@@ -891,9 +1029,84 @@
         }
 
         startPolling();
+
+        // Fire-and-forget achievement notification check
+        callRpc('pop_unnotified_achievements', { p_username: username })
+          .then(achs => { if (Array.isArray(achs) && achs.length) queueAchievementToasts(achs); })
+          .catch(() => {});
       } catch (error) {
         console.error('Portals message handling failed:', error, message);
       }
+    }
+
+    // ── Achievement Toast System ──────────────────────────────
+    const ACH_RARITY_STYLES = {
+      legendary: { accent: '#ffd700', glow: '0 0 20px rgba(255,210,0,0.30), 0 0 40px rgba(255,210,0,0.12)' },
+      epic:      { accent: '#c77dff', glow: '0 0 18px rgba(160,80,255,0.30), 0 0 36px rgba(160,80,255,0.10)' },
+      rare:      { accent: '#4da6ff', glow: '0 0 15px rgba(77,166,255,0.25)' },
+      common:    { accent: 'rgba(255,255,255,0.28)', glow: 'none' }
+    };
+    const TOAST_DISPLAY_MS = 3500;
+    const TOAST_GAP_MS     = 250;
+    const achToastQueue    = [];
+    let   achToastActive   = false;
+
+    function escHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function queueAchievementToasts(achs) {
+      for (const a of achs) achToastQueue.push(a);
+      if (!achToastActive) drainAchievementQueue();
+    }
+
+    async function drainAchievementQueue() {
+      if (!achToastQueue.length) { achToastActive = false; return; }
+      achToastActive = true;
+      await showAchievementToast(achToastQueue.shift());
+      await new Promise(r => setTimeout(r, TOAST_GAP_MS));
+      drainAchievementQueue();
+    }
+
+    function showAchievementToast(ach) {
+      return new Promise(resolve => {
+        const style      = ACH_RARITY_STYLES[ach.rarity] || ACH_RARITY_STYLES.common;
+        const rarityLabel = ach.rarity.charAt(0).toUpperCase() + ach.rarity.slice(1);
+        const hudRect    = hudEl.getBoundingClientRect();
+        const topPx      = hudRect.bottom + 8;
+
+        const toast = document.createElement('div');
+        toast.className = 'ach-toast';
+        toast.style.top = topPx + 'px';
+        toast.style.setProperty('--ach-accent', style.accent);
+        toast.style.setProperty('--ach-glow',   style.glow);
+        toast.style.setProperty('--ach-dur',     TOAST_DISPLAY_MS + 'ms');
+        toast.innerHTML = `
+          <div class="ach-toast-shimmer${ach.rarity !== 'common' ? ' run' : ''}"></div>
+          <div class="ach-toast-top">🏆 ACHIEVEMENT UNLOCKED</div>
+          <div class="ach-toast-main">
+            <div class="ach-toast-icon">${ach.icon}</div>
+            <div class="ach-toast-info">
+              <div class="ach-toast-name">${escHtml(ach.name)}</div>
+              <div class="ach-toast-desc">${escHtml(ach.description)}</div>
+              <div class="ach-toast-rarity ${ach.rarity}">${rarityLabel}</div>
+            </div>
+          </div>
+          ${ach.rarity === 'legendary' ? '<div class="ach-toast-pulse"></div>' : ''}
+          <div class="ach-toast-bar run"></div>
+        `;
+        document.body.appendChild(toast);
+
+        // Double rAF ensures the initial transform is painted before the enter class fires
+        requestAnimationFrame(() => requestAnimationFrame(() => { toast.classList.add('ach-enter'); }));
+
+        setTimeout(() => {
+          toast.classList.remove('ach-enter');
+          toast.classList.add('ach-exit');
+          toast.addEventListener('transitionend', () => { toast.remove(); resolve(); }, { once: true });
+          setTimeout(resolve, 500); // safety fallback if transitionend never fires
+        }, TOAST_DISPLAY_MS);
+      });
     }
 
     window.handlePortalsMessage = handlePortalsMessage;
@@ -912,4 +1125,3 @@
   </script>
 </body>
 </html>
-
