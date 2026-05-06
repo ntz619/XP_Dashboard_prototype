@@ -989,7 +989,8 @@
     function spawnGainText(gain) {
       const el = document.createElement('div');
       el.className = 'xp-gain';
-      el.textContent = `+${gain} XP`;
+      const fmt = Number(gain).toFixed(2).replace(/\.?0+$/, '');
+      el.textContent = `+${fmt} XP`;
       gainLayerEl.appendChild(el);
       requestAnimationFrame(() => el.classList.add('show'));
       el.addEventListener('animationend', () => el.remove(), { once: true });
