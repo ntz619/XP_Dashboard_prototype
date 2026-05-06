@@ -87,6 +87,8 @@
       box-shadow:
         0 4px 9px rgba(0, 0, 0, 0.22),
         0 0 9px rgba(255, 110, 0, 0.50);
+      cursor: pointer;
+      pointer-events: auto;
     }
 
     .streak-pill.active {
@@ -107,6 +109,8 @@
       box-shadow:
         0 4px 9px rgba(0, 0, 0, 0.22),
         0 0 9px rgba(160, 80, 255, 0.55);
+      cursor: pointer;
+      pointer-events: auto;
     }
 
     .multiplier-pill.active {
@@ -115,6 +119,80 @@
 
     .multiplier-timer {
       opacity: 0.80;
+    }
+
+    /* ── Multiplier info popup ───────────────────── */
+    .mult-popup {
+      position: absolute;
+      top: calc(100% + 5px);
+      left: 0;
+      min-width: 162px;
+      background: linear-gradient(135deg, rgba(18,10,30,0.98) 0%, rgba(10,6,18,0.99) 100%);
+      border: 1px solid rgba(160,80,255,0.20);
+      border-radius: 7px;
+      box-shadow:
+        0 10px 28px rgba(0,0,0,0.72),
+        0 0 18px rgba(140,70,255,0.14);
+      padding: 9px 11px 8px;
+      z-index: 50;
+      pointer-events: auto;
+      transform-origin: top left;
+      animation: mp-in 180ms cubic-bezier(0.34,1.45,0.64,1) both;
+    }
+
+    @keyframes mp-in {
+      from { opacity: 0; transform: translateY(-4px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);    }
+    }
+
+    .mp-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 0;
+    }
+
+    .mp-icon { font-size: 14px; line-height: 1; flex-shrink: 0; }
+
+    .mp-info { flex: 1; min-width: 0; }
+
+    .mp-name {
+      font-size: 6px;
+      color: rgba(255,255,255,0.38);
+      letter-spacing: 0.6px;
+      white-space: nowrap;
+    }
+
+    .mp-val {
+      font-size: 8.5px;
+      color: rgba(255,255,255,0.88);
+      margin-top: 1px;
+      white-space: nowrap;
+    }
+
+    .mp-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+      margin: 5px -3px;
+    }
+
+    .mp-total {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 3px;
+    }
+
+    .mp-total-label {
+      font-size: 6px;
+      color: rgba(255,196,0,0.55);
+      letter-spacing: 1.2px;
+    }
+
+    .mp-total-val {
+      font-size: 11px;
+      color: var(--gold-1);
+      text-shadow: 0 1px 6px rgba(255,196,0,0.40);
     }
 
     .level-up-pill {
@@ -452,7 +530,6 @@
       color: rgba(255,196,0,0.50);
       margin-bottom: 5px;
     }
-    .quest-toast .ach-toast-top { color: rgba(62,203,112,0.55); }
 
     .ach-toast-main {
       display: flex;
@@ -475,10 +552,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .quest-toast .ach-toast-name {
-      color: #7df5a0;
-      text-shadow: 0 1px 5px rgba(62,203,112,0.35);
-    }
 
     .ach-toast-desc {
       font-size: 7.5px;
@@ -496,8 +569,6 @@
     .ach-toast-rarity.epic      { color: #c77dff; }
     .ach-toast-rarity.rare      { color: #4da6ff; }
     .ach-toast-rarity.common    { color: rgba(255,255,255,0.28); }
-    /* Quest: rarity slot shows XP reward in green */
-    .quest-toast .ach-toast-rarity { color: #7df5a0; letter-spacing: 0.5px; }
 
     /* drain bar across the bottom showing time remaining */
     .ach-toast-bar {
@@ -546,6 +617,28 @@
         <span id="streakLabel">🔥 1</span>
       </div>
       <div id="levelUpPill" class="level-up-pill">LEVEL UP!</div>
+      <!-- Multiplier info popup -->
+      <div id="multPopup" class="mult-popup" style="display:none;">
+        <div class="mp-row" id="mpStreakRow" style="display:none;">
+          <span class="mp-icon">🔥</span>
+          <div class="mp-info">
+            <div class="mp-name" id="mpStreakName">3-DAY STREAK</div>
+            <div class="mp-val" id="mpStreakVal">+10% XP</div>
+          </div>
+        </div>
+        <div class="mp-row" id="mpBoostRow" style="display:none;">
+          <span class="mp-icon">💜</span>
+          <div class="mp-info">
+            <div class="mp-name">ACTIVE BOOST</div>
+            <div class="mp-val" id="mpBoostVal">2.0X</div>
+          </div>
+        </div>
+        <div class="mp-divider" id="mpDivider" style="display:none;"></div>
+        <div class="mp-total">
+          <span class="mp-total-label">⚡ TOTAL</span>
+          <span class="mp-total-val" id="mpTotalVal">1.0X XP</span>
+        </div>
+      </div>
     </div>
 
     <div class="bar-shell">
@@ -606,6 +699,12 @@
     let animationFrame = null;
     let hasInitialXpLoaded = false;
     let multiplierInterval = null;
+    let currentStreak      = 0;
+    let currentStreakMult  = 1.0;
+    let currentTimedMult   = 1.0;
+    let currentTimedExpiry = null;
+    let multPopupOpen      = false;
+    let multPopupAutoClose = null;
 
     const hudEl           = document.getElementById('hud');
     const barEl           = document.getElementById('bar');
@@ -621,6 +720,14 @@
     const gainLayerEl     = document.getElementById('gainLayer');
     const sparkLayerEl    = document.getElementById('sparkLayer');
     const flashLayerEl    = document.getElementById('flashLayer');
+    const multPopupEl     = document.getElementById('multPopup');
+    const mpStreakRowEl   = document.getElementById('mpStreakRow');
+    const mpStreakNameEl  = document.getElementById('mpStreakName');
+    const mpStreakValEl   = document.getElementById('mpStreakVal');
+    const mpBoostRowEl    = document.getElementById('mpBoostRow');
+    const mpBoostValEl    = document.getElementById('mpBoostVal');
+    const mpDividerEl     = document.getElementById('mpDivider');
+    const mpTotalValEl    = document.getElementById('mpTotalVal');
 
     const levelUpAudio = new Audio(LEVEL_UP_SOUND_URL);
     levelUpAudio.preload = 'auto';
@@ -674,45 +781,119 @@
 
     function updateMultiplierDisplay(row) {
       if (!row) return;
-      const multiplier  = Number(row.xp_multiplier) || 1.0;
-      const expiresAt   = row.xp_multiplier_expires_at ? new Date(row.xp_multiplier_expires_at) : null;
-
-      if (multiplierInterval) { clearInterval(multiplierInterval); multiplierInterval = null; }
-
-      if (multiplier <= 1.0 || !expiresAt || expiresAt.getTime() <= Date.now()) {
-        multiplierPillEl.classList.remove('active');
-        return;
-      }
-
-      multiplierLabelEl.textContent = `${multiplier.toFixed(1)}X XP`;
-      multiplierPillEl.classList.add('active');
-
-      function tick() {
-        const secsLeft = (expiresAt.getTime() - Date.now()) / 1000;
-        if (secsLeft <= 0) {
-          clearInterval(multiplierInterval);
-          multiplierInterval = null;
-          multiplierPillEl.classList.remove('active');
-          return;
-        }
-        multiplierTimerEl.textContent = formatCountdown(secsLeft);
-      }
-
-      tick();
-      multiplierInterval = setInterval(tick, 1000);
+      const mult     = Number(row.xp_multiplier) || 1.0;
+      const expiry   = row.xp_multiplier_expires_at ? new Date(row.xp_multiplier_expires_at) : null;
+      const timedOn  = mult > 1.0 && expiry && expiry.getTime() > Date.now();
+      currentTimedMult   = timedOn ? mult   : 1.0;
+      currentTimedExpiry = timedOn ? expiry : null;
+      refreshMultiplierPill();
     }
 
     // ── Daily login streak display ──────────────────────────
 
     function updateStreakDisplay(row) {
       if (!row) return;
-      const streak = Number(row.daily_login_streak) || 0;
-      if (streak > 0) {
-        streakLabelEl.textContent = `🔥 ${streak}`;
+      currentStreak = Number(row.daily_login_streak) || 0;
+      if (currentStreak >= 7)       currentStreakMult = 1.2;
+      else if (currentStreak >= 3)  currentStreakMult = 1.1;
+      else                          currentStreakMult = 1.0;
+
+      if (currentStreak > 0) {
+        streakLabelEl.textContent = `🔥 ${currentStreak}`;
         streakPillEl.classList.add('active');
       } else {
         streakPillEl.classList.remove('active');
       }
+
+      refreshMultiplierPill();
+      if (multPopupOpen) renderMultPopup();
+    }
+
+    // ── Combined multiplier pill ────────────────────────────
+
+    function refreshMultiplierPill() {
+      if (multiplierInterval) { clearInterval(multiplierInterval); multiplierInterval = null; }
+
+      const timedOn  = currentTimedMult > 1.0 && currentTimedExpiry && currentTimedExpiry.getTime() > Date.now();
+      const combined = (timedOn ? currentTimedMult : 1.0) * currentStreakMult;
+
+      if (combined <= 1.005) {          // nothing meaningful active
+        multiplierPillEl.classList.remove('active');
+        return;
+      }
+
+      multiplierPillEl.classList.add('active');
+      multiplierLabelEl.textContent = `${combined.toFixed(1)}X XP`;
+      multiplierTimerEl.textContent = '';
+
+      if (timedOn) {
+        const tick = () => {
+          const secsLeft = (currentTimedExpiry.getTime() - Date.now()) / 1000;
+          if (secsLeft <= 0) {
+            clearInterval(multiplierInterval); multiplierInterval = null;
+            currentTimedMult = 1.0; currentTimedExpiry = null;
+            refreshMultiplierPill();
+            if (multPopupOpen) renderMultPopup();
+            return;
+          }
+          const live = currentTimedMult * currentStreakMult;
+          multiplierLabelEl.textContent = `${live.toFixed(1)}X XP`;
+          multiplierTimerEl.textContent = formatCountdown(secsLeft);
+          if (multPopupOpen) renderMultPopup();
+        };
+        tick();
+        multiplierInterval = setInterval(tick, 1000);
+      }
+    }
+
+    // ── Multiplier popup ────────────────────────────────────
+
+    function renderMultPopup() {
+      const timedOn  = currentTimedMult > 1.0 && currentTimedExpiry && currentTimedExpiry.getTime() > Date.now();
+      const streakOn = currentStreakMult > 1.005;
+      const hasTwo   = timedOn && streakOn;
+
+      // Streak row
+      mpStreakRowEl.style.display = streakOn ? 'flex' : 'none';
+      if (streakOn) {
+        mpStreakNameEl.textContent = `${currentStreak}-DAY STREAK`;
+        mpStreakValEl.textContent  = currentStreak >= 7 ? '+20% XP' : '+10% XP';
+      }
+
+      // Timed boost row
+      mpBoostRowEl.style.display = timedOn ? 'flex' : 'none';
+      if (timedOn) {
+        const secsLeft = Math.max(0, (currentTimedExpiry.getTime() - Date.now()) / 1000);
+        mpBoostValEl.textContent = `${currentTimedMult.toFixed(1)}X · ${formatCountdown(secsLeft)} left`;
+      }
+
+      // Divider only when both rows are visible
+      mpDividerEl.style.display = hasTwo ? 'block' : 'none';
+
+      // Total
+      const combined = (timedOn ? currentTimedMult : 1.0) * currentStreakMult;
+      mpTotalValEl.textContent = `${combined.toFixed(1)}X XP`;
+    }
+
+    function openMultPopup() {
+      multPopupOpen = true;
+      renderMultPopup();
+      // Re-trigger entry animation
+      multPopupEl.style.display = 'none';
+      void multPopupEl.offsetWidth;
+      multPopupEl.style.display = 'block';
+      if (multPopupAutoClose) clearTimeout(multPopupAutoClose);
+      multPopupAutoClose = setTimeout(closeMultPopup, 6000);
+    }
+
+    function closeMultPopup() {
+      multPopupOpen = false;
+      multPopupEl.style.display = 'none';
+      if (multPopupAutoClose) { clearTimeout(multPopupAutoClose); multPopupAutoClose = null; }
+    }
+
+    function toggleMultPopup() {
+      multPopupOpen ? closeMultPopup() : openMultPopup();
     }
 
     // ── Row helpers ─────────────────────────────────────────
@@ -1141,6 +1322,10 @@
       });
     }
 
+    // ── Pill click → toggle multiplier popup ───────────────
+    multiplierPillEl.addEventListener('click', e => { e.stopPropagation(); toggleMultPopup(); });
+    streakPillEl.addEventListener('click',     e => { e.stopPropagation(); toggleMultPopup(); });
+
     window.handlePortalsMessage = handlePortalsMessage;
     window.currentPetId = currentPetId;
     window.currentStats = currentStats;
@@ -1157,3 +1342,5 @@
   </script>
 </body>
 </html>
+
+
