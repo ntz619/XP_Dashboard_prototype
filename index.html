@@ -64,6 +64,7 @@
       margin: 0 0 2px 5px;
       position: relative;
       z-index: 3;
+      pointer-events: none; /* children override individually */
     }
 
     .level-label {
@@ -88,7 +89,7 @@
         0 4px 9px rgba(0, 0, 0, 0.22),
         0 0 9px rgba(255, 110, 0, 0.50);
       cursor: pointer;
-      pointer-events: auto;
+      pointer-events: auto !important;
     }
 
     .streak-pill.active {
@@ -110,7 +111,7 @@
         0 4px 9px rgba(0, 0, 0, 0.22),
         0 0 9px rgba(160, 80, 255, 0.55);
       cursor: pointer;
-      pointer-events: auto;
+      pointer-events: auto !important;
     }
 
     .multiplier-pill.active {
@@ -135,7 +136,7 @@
         0 0 18px rgba(140,70,255,0.14);
       padding: 9px 11px 8px;
       z-index: 50;
-      pointer-events: auto;
+      pointer-events: auto !important;
       transform-origin: top left;
       animation: mp-in 180ms cubic-bezier(0.34,1.45,0.64,1) both;
     }
@@ -1323,6 +1324,13 @@
     }
 
     // ── Pill click → toggle multiplier popup ───────────────
+    // Force pointer-events via inline style — overrides any SDK-applied inline style
+    // (the Portals SDK sets pointer-events:none on body when noPointerEvents=true;
+    //  inline style on the element itself wins over body's inline style for descendants)
+    multiplierPillEl.style.setProperty('pointer-events', 'auto', 'important');
+    streakPillEl.style.setProperty('pointer-events', 'auto', 'important');
+    multPopupEl.style.setProperty('pointer-events', 'auto', 'important');
+
     multiplierPillEl.addEventListener('click', e => { e.stopPropagation(); toggleMultPopup(); });
     streakPillEl.addEventListener('click',     e => { e.stopPropagation(); toggleMultPopup(); });
 
